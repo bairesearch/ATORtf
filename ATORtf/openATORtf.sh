@@ -1,0 +1,1 @@
+nedit ATORtf*.py &
