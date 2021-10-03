@@ -24,13 +24,13 @@ source activate ATORtf
 python ATORtf.py images/leaf1.png
 
 # Description:
-ATORtf is a hardware accelerated version of BAI ATOR (Axis Transformation Object Recognition).
+ATORtf is a hardware accelerated version of BAI ATOR (Axis Transformation Object Recognition) for TensorFlow.
 
 ATORtf uses ellipsoid features (rather than point/centroid features of the ATOR specification*), and normalises them with respect to their major/minor ellipticity axis orientation. 
 
-There are a number of core advantages of using ellipsoid features over point features;
-a) the number of feature sets/normalised snapshots requires significantly reduced
-b) scene component structure can be maintained (as detected component ellipses can be represented in a hierarchical graph structure)
+There are a number of advantages of using ellipsoid features over point features;
+* the number of feature sets/normalised snapshots required is significantly reduced
+* scene component structure can be maintained (as detected component ellipses can be represented in a hierarchical graph structure)
 
 Ellipse features/components are detected based on simulated artificial receptive fields; RF (on/off, off/on).
 
