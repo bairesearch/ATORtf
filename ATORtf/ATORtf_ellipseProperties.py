@@ -43,6 +43,7 @@ class EllipseProperties():	#or EllipsoidProperties
 		#self.colour = -1
 
 def drawEllipse(outputImage, ellipseProperties):
+	#https://docs.opencv.org/4.5.3/d6/d6e/group__imgproc__draw.html#ga28b2267d35786f5f890ca167236cbc69
 	outputImageMod = cv2.ellipse(outputImage, ellipseProperties.centerCoordinates, ellipseProperties.axesLength, ellipseProperties.angle, 0, 360, ellipseProperties.colour, -1)
 	return outputImageMod
 

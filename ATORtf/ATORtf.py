@@ -119,11 +119,6 @@ def createRFhierarchyAccelerated(inputimagefilename):
 		RFFiltersList = RFFiltersListAllRes[resolutionIndex]
 		RFPropertiesList = RFPropertiesListAllRes[resolutionIndex]
 		applyRFFiltersList(inputImageRGBTF, inputImageGrayTF, resolutionIndex, RFFiltersList, RFPropertiesList)
-		
-def normaliseRFFilter(RFFilter, RFProperties):
-	#normalise ellipse respect to major/minor ellipticity axis orientation (WRT self)
-	RFFilterNormalised = transformRFFilterTF(RFFilter, RFProperties) 
-	return RFFilterNormalised
 
 def normaliseRFProperties(RFProperties):
 	#normalise ellipse respect to major/minor ellipticity axis orientation (WRT self)
@@ -139,36 +134,78 @@ def normaliseRFProperties(RFProperties):
 	#	RFPropertiesNormalised.angle = 90
 		
 def normaliseRFComponentWRTparent(neuronComponent, RFPropertiesParent):
-	RFTransformedProperties, RFTransformationProperties = generateRFTransformedPropertiesWRTparent(neuronComponent, RFPropertiesParent)
+	neuronComponent.RFPropertiesNormalisedWRTparent = generateRFTransformedProperties(neuronComponent, RFPropertiesParent)
 	if(debugSaveRFFilters):
-		neuronComponent.RFFilterNormalisedWRTparent = transformRFFilterTF(neuronComponent.RFFilter, RFTransformationProperties)	#not required: for debugging only
-	neuronComponent.RFPropertiesWRTparent = RFTransformedProperties
+		neuronComponent.RFFilterNormalisedWRTparent = transformRFFilterTF(neuronComponent.RFFilter, RFPropertiesParent)	#not required: for debugging only
 
-#CHECKTHIS: requires coding;
 def generateRFTransformedProperties(neuronComponent, RFPropertiesParent):
-	
-	RFTransformedProperties = None
-	RFTransformationProperties = None
-	
-	#RFTransformationProperties = copy.copy(neuronComponent.RFProperties)	#used for simplicity (not all properties are required)
-	#RFTransformationProperties.centerCoordinates = (neuronComponent.centerCoordinates[0]-RFPropertiesParent.centerCoordinates[0], neuronComponent.centerCoordinates[1]-RFPropertiesParent.centerCoordinates[1])	#2D code only
-	#RFTransformationProperties.axesLength = (neuronComponent.axesLength[0]/RFPropertiesParent.axesLength[0], neuronComponent.axesLength[1]/RFPropertiesParent.axesLength[1])	#2D code only
-	#RFTransformationProperties.angle = 
-
-	#RFTransformedProperties = copy.copy(neuronComponent.RFProperties)
-	#RFTransformedProperties.centerCoordinates = 
-	#RFTransformedProperties.axesLength = 
-	#RFTransformedProperties.angle = 
+	if(RFPropertiesParent.numberOfDimensions == 2):
+		return generateRFTransformedProperties2D(neuronComponent, RFPropertiesParent)
+	elif(RFPropertiesParent.numberOfDimensions == 3):
+		return generateRFTransformedProperties3D(neuronComponent, RFPropertiesParent)
 		
-	return RFTransformedProperties, RFTransformationProperties
-	
-def transformRFFilterTF(RFFilter, RFProperties):
-	centerCoordinates = [-RFProperties.centerCoordinates[0], -RFProperties.centerCoordinates[1]]
-	axesLength = [1.0/RFProperties.axesLength[0], 1.0/RFProperties.axesLength[1]]
-	angle = -RFProperties.angle
-	return transformRFFilterTF(RFFilter, centerCoordinates, axesLength, angle)
+def generateRFTransformedProperties2D(neuronComponent, RFPropertiesParent):
+	RFTransformedProperties = copy.copy(neuronComponent.RFProperties)
+	RFTransformedProperties.centerCoordinates = transformPoint2D(neuronComponent.centerCoordinates, RFPropertiesParent)
+	endCoordinates = calculateEndCoordinatesPosition2D(neuronComponent)
+	endCoordinates = transformPoint2D(endCoordinates, RFPropertiesParent)
+	RFTransformedProperties.axesLength = calculateDistance2D(RFTransformedProperties.centerCoordinates, endCoordinates)
+	RFTransformedProperties.angle = neuronComponent.angle-RFPropertiesParent.angle
+	return RFTransformedProperties
+		
+def generateRFTransformedProperties3D(neuronComponent, RFPropertiesParent):
+	RFTransformedProperties = copy.copy(neuronComponent.RFProperties)
+	RFTransformedProperties.centerCoordinates = transformPoint3D(neuronComponent.centerCoordinates, RFPropertiesParent)
+	endCoordinates = calculateEndCoordinatesPosition3D(neuronComponent)
+	endCoordinates = transformPoint3D(endCoordinates, RFPropertiesParent)
+	RFTransformedProperties.axesLength = calculateDistance3D(RFTransformedProperties.centerCoordinates, endCoordinates)
+	RFTransformedProperties.angle = ((neuronComponent.angle[0]-RFPropertiesParent.angle[0]), (neuronComponent.angle[1]-RFPropertiesParent.angle[1]))
+	return RFTransformedProperties
 
-def transformRFFilterTF(RFFilter, centerCoordinates, axesLength, angle):
+def transformPoint2D(coordinates, RFPropertiesParent):
+	coordinatesTransformed = (coordinates[0]-RFPropertiesParent.centerCoordinates[0], coordinates[1]-RFPropertiesParent.centerCoordinates[1])
+	coordinatesRelativeAfterRotation = ATORtf_operations.calculateRelativePosition2D(RFPropertiesParent.angle, RFPropertiesParent.axisLength[0])
+	coordinatesTransformed = (coordinatesTransformed[0]-coordinatesRelativeAfterRotation[0], coordinatesTransformed[1]-coordinatesRelativeAfterRotation[1])	#CHECKTHIS: + or -
+	coordinatesTransformed = (coordinates[0]/RFPropertiesParent.axesLength[0], coordinates[1]/RFPropertiesParent.axesLength[1])
+	return coordinatesTransformed
+	
+def transformPoint3D(coordinates, RFPropertiesParent):
+	coordinatesTransformed = (coordinates[0]-RFPropertiesParent.centerCoordinates[0], coordinates[1]-RFPropertiesParent.centerCoordinates[1], coordinates[2]-RFPropertiesParent.centerCoordinates[2])
+	coordinatesRelativeAfterRotation = ATORtf_operations.calculateRelativePosition3D(RFPropertiesParent.angle, RFPropertiesParent.axisLength[0])
+	coordinatesTransformed = (coordinatesTransformed[0]-coordinatesRelativeAfterRotation[0], coordinatesTransformed[1]-coordinatesRelativeAfterRotation[1], coordinatesTransformed[2]-coordinatesRelativeAfterRotation[2])	#CHECKTHIS: + or -
+	coordinatesTransformed = (coordinates[0]/RFPropertiesParent.axesLength[0], coordinates[1]/RFPropertiesParent.axesLength[1], coordinates[2]/RFPropertiesParent.axesLength[2])
+	return coordinatesTransformed
+		
+def calculateEndCoordinatesPosition2D(neuronComponent):
+	endCoordinatesRelativeToCentreCoordinates = ATORtf_operations.calculateRelativePosition2D(neuronComponent.angle, neuronComponent.axisLength[0])
+	endCoordinates = (neuronComponent.centerCoordinates[0]+endCoordinatesRelativeToCentreCoordinates[0], neuronComponent.centerCoordinates[1]+endCoordinatesRelativeToCentreCoordinates[1])	#CHECKTHIS: + or -
+	return endCoordinates
+	
+def calculateEndCoordinatesPosition3D(neuronComponent):
+	endCoordinatesRelativeToCentreCoordinates = ATORtf_operations.calculateRelativePosition3D(neuronComponent.angle, neuronComponent.axisLength)
+	endCoordinates = (neuronComponent.centerCoordinates[0]+endCoordinatesRelativeToCentreCoordinates[0], neuronComponent.centerCoordinates[1]+endCoordinatesRelativeToCentreCoordinates[1], neuronComponent.centerCoordinates[2]+endCoordinatesRelativeToCentreCoordinates[2])	#CHECKTHIS: + or -
+	return endCoordinates
+
+
+		
+	
+def normaliseRFFilter(RFFilter, RFProperties):
+	#normalise ellipse respect to major/minor ellipticity axis orientation (WRT self)
+	RFFilterNormalised = transformRFFilterWRTparentTF(RFFilter, RFProperties) 
+	return RFFilterNormalised
+	
+def transformRFFilterTF(RFFilter, RFPropertiesParent):
+	if(RFPropertiesParent.numberOfDimensions == 2):
+		centerCoordinates = [-RFPropertiesParent.centerCoordinates[0], -RFPropertiesParent.centerCoordinates[1]]
+		axesLength = [1.0/RFPropertiesParent.axesLength[0], 1.0/RFPropertiesParent.axesLength[1]]
+		angle = -RFPropertiesParent.angle
+		RFFilterTransformed = transformRFFilterTF2D(RFFilter, centerCoordinates, axesLength, angle)
+	elif(RFPropertiesParent.numberOfDimensions == 3):
+		print("error transformRFFilterWRTparentTF: RFPropertiesParent.numberOfDimensions == 3 not yet coded")
+		quit()
+	return RFFilterTransformed
+	
+def transformRFFilterTF2D(RFFilter, centerCoordinates, axesLength, angle):
 	#CHECKTHIS: 2D code only;
 	RFFilterTransformed = tf.expand_dims(RFFilterTransformed, 0)	#add extra dimension for num_images
 	RFFilterTransformed = tfa.image.rotate(RFFilterTransformed, ATORtf_operations.convertDegreesToRadians(angle))		#https://www.tensorflow.org/addons/api_docs/python/tfa/image/rotate
@@ -253,7 +290,7 @@ def applyRFFilters(inputImageTF, RFFiltersTensor, numberOfDimensions):
 	
 def generateRFFilters(resolutionIndex):
 
-	#filters are generated based on human magnocellular/parvocellular pathway wavelength discrimination
+	#filters are generated based on human magnocellular/parvocellular/koniocellular wavelength discrimination in LGN and VX (double/opponent receptive fields)
 	
 	RFFiltersList = []
 	RFPropertiesList = []
@@ -264,11 +301,11 @@ def generateRFFilters(resolutionIndex):
 	RFFiltersHL, RFPropertiesHL = generateRotationalInvariantRFFilters(resolutionIndex, False, colourH, colourL)
 	RFFiltersLH, RFPropertiesLH = generateRotationalInvariantRFFilters(resolutionIndex, False, colourL, colourH)
 	
-	#parvocellular filters (based on 2 cardinal colour axes; ~red-~green, ~blue-~yellow);
-	colourR = (255, 000, 000)	#red
-	colourG = (000, 255, 000)	#green
-	colourB = (000, 000, 255)	#blue
-	colourY = (255, 255, 000)	#yellow
+	#parvocellular/koniocellular filters (based on 2 cardinal colour axes; ~red-~green, ~blue-~yellow);
+	colourR = (255, -255, 0)	#red+, green-
+	colourG = (-255, 255, 0)	#green+, red-
+	colourB = (-127, -127, 255)	#blue+, yellow-
+	colourY = (127, 127, -255)	#yellow+, blue-
 	RFFiltersRG, RFPropertiesRG = generateRotationalInvariantRFFilters(resolutionIndex, True, colourR, colourG)
 	RFFiltersGR, RFPropertiesGR = generateRotationalInvariantRFFilters(resolutionIndex, True, colourG, colourR)
 	RFFiltersBY, RFPropertiesBY = generateRotationalInvariantRFFilters(resolutionIndex, True, colourB, colourY)
@@ -318,7 +355,7 @@ def generateRotationalInvariantRFFilters(resolutionIndex, isColourFilter, filter
 						RFPropertiesInside = ATORtf_ellipseProperties.EllipseProperties(resolutionIndex, resolutionFactor, imageWidthR, imageHeightR, centerCoordinates, axesLength, angle, filterInsideColour)
 						RFPropertiesOutside = ATORtf_ellipseProperties.EllipseProperties(resolutionIndex, resolutionFactor, imageWidthR, imageHeightR, centerCoordinates, axesLength, angle, filterOutsideColour)
 						RFPropertiesInside.isColourFilter = isColourFilter
-						RFPropertiesOutside. isColourFilter = isColourFilter
+						RFPropertiesOutside.isColourFilter = isColourFilter
 						
 						RFFilter = generateRFFilter(resolutionIndex, isColourFilter, RFPropertiesInside, RFPropertiesOutside)
 						RFFiltersList2.append(RFFilter)
