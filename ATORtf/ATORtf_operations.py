@@ -21,6 +21,7 @@ ATORtf Operations
 import tensorflow as tf
 import os
 import cv2
+import math
 from PIL import Image
 
 opencvVersion = 3	#or 4

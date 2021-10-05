@@ -26,11 +26,10 @@ ellipseAngleResolution = 10	#degrees
 minimumEllipseFitErrorRequirement = 1500.0	#calibrate
 
 class EllipseProperties():	#or EllipsoidProperties
-	def __init__(self, resolutionIndex,  resolutionFactor, imageHeight, imageWidth, centerCoordinates, axesLength, angle, colour):
+	def __init__(self, resolutionIndex,  resolutionFactor, imageSize, centerCoordinates, axesLength, angle, colour):
 		self.resolutionIndex = resolutionIndex
 		self.resolutionFactor = resolutionFactor
-		self.imageHeight = imageHeight
-		self.imageWidth = imageWidth
+		self.imageSize = imageSize
 		self.centerCoordinates = centerCoordinates
 		self.axesLength = axesLength
 		self.angle = angle
@@ -82,4 +81,9 @@ def centroidOverlapsEllipse(ellipseProperties, ellipsePropertiesOptimumLast):
 		result = False
 	return result		
 	
-	
+def printEllipseProperties(ellipseProperties):
+	if(ellipseProperties.numberOfDimensions == 2):
+		print("printEllipseProperties: numberOfDimensions = ", ellipseProperties.numberOfDimensions, ", resolutionIndex = ", ellipseProperties.resolutionIndex, ", isColourFilter = ", ellipseProperties.isColourFilter, ", imageSize = ", ellipseProperties.imageSize[0], ",", ellipseProperties.imageSize[1], ", centerCoordinates = ", ellipseProperties.centerCoordinates[0], ",", ellipseProperties.centerCoordinates[1], ", axesLength = ", ellipseProperties.axesLength[0], ",", ellipseProperties.axesLength[1], " angle = ", ellipseProperties.angle, ", colour = ", ellipseProperties.colour[0], ",", ellipseProperties.colour[1], ",", ellipseProperties.colour[2])
+	elif(ellipseProperties.numberOfDimensions == 3):
+		print("printEllipseProperties: numberOfDimensions = ", ellipseProperties.numberOfDimensions, ", resolutionIndex = ", ellipseProperties.resolutionIndex, ", isColourFilter = ", ellipseProperties.isColourFilter, ", imageSize = ", ellipseProperties.imageSize[0], ",", ellipseProperties.imageSize[1], ",", ellipseProperties.imageSize[2], ", centerCoordinates = ", ellipseProperties.centerCoordinates[0], ",", ellipseProperties.centerCoordinates[1], ",", ellipseProperties.centerCoordinates[2], ", axesLength = ", ellipseProperties.axesLength[0], ",", ellipseProperties.axesLength[1], ",", ellipseProperties.axesLength[2], " angle = ", ellipseProperties.angle, ", colour = ", ellipseProperties.colour[0], ",", ellipseProperties.colour[1], ",", ellipseProperties.colour[2])	
+

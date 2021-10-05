@@ -140,17 +140,19 @@ def detectEllipsesTrialResize(inputimagefilename):
 								for colour2 in range(0, 256, ellipseColourResolution):
 									for colour3 in range(0, 256, ellipseColourResolution):
 
+										imageSize = (imageWidth, imageHeight)
 										centerCoordinates = (centerCoordinates1, centerCoordinates2)
 										axesLength = (axesLength1, axesLength2)
 										colour = (colour1, colour2, colour3)
-
-										#print("centerCoordinates = ", centerCoordinates1, ",", centerCoordinates2, ", axesLength1 = ", axesLength1, ",", axesLength2, ", angle = ", angle, ", colour = ", colour1, ",", colour2, ",", colour3)
-
-										ellipseProperties = ATORtf_ellipseProperties.EllipseProperties(resolutionIndex, resolutionFactor, imageHeight, imageWidth, centerCoordinates, axesLength, angle, colour)
+										
+										ellipseProperties = ATORtf_ellipseProperties.EllipseProperties(resolutionIndex, resolutionFactor, imageSize, centerCoordinates, axesLength, angle, colour)
 										inputImageRmod, ellipseFitError = ATORtf_ellipseProperties.testEllipseApproximation(inputImageR, ellipseProperties)
 	
 										ellipsePropertiesOrderedDict[ellipseFitError] = ellipseProperties
 										testEllipseIndex = testEllipseIndex + 1
+										
+										#ATORtf_ellipseProperties.printEllipseProperties(ellipseProperties)
+
 																									
 		ellipsePropertiesOptimumNormalisedR = []
 		for ellipseFitError, ellipseProperties in ellipsePropertiesOrderedDict.items():
