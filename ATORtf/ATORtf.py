@@ -8,17 +8,17 @@ Richard Bruce Baxter - Copyright (c) 2021 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-conda create -n ATORtf python=3
+conda create -n ATORtf python=3.9
 source activate ATORtf
+pip install tensorflow-gpu==2.6
 conda install --file condaRequirements.txt
 	where condaRequirements.txt contains;
 		numpy
-		tensorflow
 		click
-		opencv
 		pillow
-conda install -c esri tensorflow-addons
-	
+pip install tensorflow-addons
+pip install opencv-python opencv-contrib-python
+
 # Usage:
 source activate ATORtf
 python ATORtf.py images/leaf1.png
@@ -41,11 +41,12 @@ Requires upgrading to support 3D receptive field detection (ellipses and ellipso
 
 """
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
 import click
-import os
 import cv2
 import copy
 import sys
@@ -53,13 +54,15 @@ import ATORtf_detectEllipses
 import ATORtf_ellipseProperties
 import ATORtf_operations
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 np.set_printoptions(threshold=sys.maxsize)
 
-debugLowIterations = True
+debugLowIterations = False
 debugVerbose = True
+debugSaveRFFilters = True	#only RF properties are required to be saved by ATOR algorithm (not image RF pixel data)
+if(debugSaveRFFilters):
+	RFFilterImageTransformFillValue = 0.0
 
-resolutionIndexFirst = 1
+resolutionIndexFirst = 0	#mandatory
 numberOfResolutions = 5	#x; lowest res sample: 1/(2^x)
 minimumEllipseLength = 2
 ellipseCenterCoordinatesResolution = 1	#pixels (at resolution r)
@@ -77,7 +80,6 @@ ellipseNormalisedAngle = 0.0
 ellipseNormalisedCentreCoordinates = 0.0 
 ellipseNormalisedAxesLength = 1.0
 
-debugSaveRFFilters = True	#only RF properties are required to be saved by ATOR algorithm (not image RF pixel data)
 
 class ATORneuron():
 	def __init__(self, resolutionIndex, RFProperties, RFFilter):
@@ -129,7 +131,10 @@ def createRFhierarchyAccelerated(inputimagefilename):
 		resolutionIndexMax = numberOfResolutions+1
 	
 	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
-		resolutionFactor, resolutionFactorReverse, imageSize = getImageDimensionsR(resolutionIndex)
+		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase)
+		print("resolutionFactor = ", resolutionFactor)
+		print("resolutionFactorReverse = ", resolutionFactorReverse)
+		print("imageSize = ", imageSize)
 		inputImageRGBTF = tf.image.resize(inputImageRGBTF, imageSize)
 		inputImageGrayTF = tf.image.resize(inputImageGrayTF, imageSize)
 		inputImageRGBSegments, inputImageGraySegments = generateImageSegments(resolutionIndex, inputImageRGBTF, inputImageGrayTF)
@@ -143,10 +148,10 @@ def createRFhierarchyAccelerated(inputimagefilename):
 		
 	#applyRFFilters:
 	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
-		inputImageRGBSegments = inputImageRGBSegmentsAllRes[resolutionIndex-resolutionIndexFirst]
-		inputImageGraySegments = inputImageGraySegmentsAllRes[resolutionIndex-resolutionIndexFirst]
-		RFFiltersList = RFFiltersListAllRes[resolutionIndex-resolutionIndexFirst]
-		RFFiltersPropertiesList = RFFiltersPropertiesListAllRes[resolutionIndex-resolutionIndexFirst]
+		inputImageRGBSegments = inputImageRGBSegmentsAllRes[resolutionIndex]
+		inputImageGraySegments = inputImageGraySegmentsAllRes[resolutionIndex]
+		RFFiltersList = RFFiltersListAllRes[resolutionIndex]
+		RFFiltersPropertiesList = RFFiltersPropertiesListAllRes[resolutionIndex]
 		applyRFFiltersList(resolutionIndex, inputImageRGBSegments, inputImageGraySegments, RFFiltersList, RFFiltersPropertiesList, ATORneuronListAllLayers)
 
 def generateImageSegments(resolutionIndex, inputImageRGBTF, inputImageGrayTF):
@@ -278,7 +283,7 @@ def generateRFFilter(resolutionIndex, isColourFilter, RFPropertiesInside, RFProp
 	# where "-" = -RFColourOutside [R G B], "+" = +RFColourInside [R G B], and "0" = [0, 0, 0]
 	
 	#generate ellipse on blank canvas
-	#resolutionFactor, resolutionFactorReverse, imageSize = getImageDimensionsR(resolutionIndex)
+	#resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase)
 	blankArray = np.full((RFPropertiesInside.imageSize[1], RFPropertiesInside.imageSize[0], 1), 0, np.uint8)	#grayscale (or black/white)	#0: black	#or filterSize
 	
 	ellipseFilterImageInside = copy.deepcopy(blankArray)
@@ -342,9 +347,11 @@ def generateRFFilter(resolutionIndex, isColourFilter, RFPropertiesInside, RFProp
 	
 def applyRFFiltersList(resolutionIndex, inputImageRGBSegments, inputImageGraySegments, RFFiltersList, RFFiltersPropertiesList, ATORneuronListAllLayers):
 	
+	print("applyRFFiltersList: resolutionIndex = ", resolutionIndex)
+	
 	ATORneuronList = []	#for resolutionIndex
 	
-	resolutionFactor, resolutionFactorReverse, imageSize = getImageDimensionsR(resolutionIndex)
+	resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase)
 	#print("imageSize = ", imageSize)
 	#print("inputImageGrayTF.shape = ", inputImageGrayTF.shape)
 	#print("inputImageRGBTF.shape = ", inputImageRGBTF.shape)
@@ -371,14 +378,14 @@ def applyRFFiltersList(resolutionIndex, inputImageRGBSegments, inputImageGraySeg
 				RFProperties = RFPropertiesList2[RFlistIndex2]
 				RFFilter = None
 				if(debugSaveRFFilters):
-					RFFilter = RFFiltersTensor[RFlistIndex2]	#not required
+					RFFilter = RFFiltersTensor[RFProperties.filterIndex]	#not required
 					
 				#create child neuron:
 				neuron = ATORneuron(resolutionIndex, RFProperties, RFFilter)
 				ATORneuronList.append(neuron)
 				
 				#add to parent neuron:
-				foundParentNeuron, parentNeuron = findNeuron(ATORneuronListAllLayers, resolutionIndex-1, RFProperties)
+				foundParentNeuron, parentNeuron = findNeuron(ATORneuronListAllLayers, resolutionIndex, RFProperties)
 				if(foundParentNeuron):	
 					parentNeuron.neuronComponents.append(neuron)
 					normaliseRFComponentWRTparent(neuron, parentNeuron.RFProperties)
@@ -414,9 +421,10 @@ def applyRFFilters(resolutionIndex, inputImageSegments, RFFiltersTensor, numberO
 			centerCoordinates = (centerCoordinates1, centerCoordinates2)
 			allFilterCoordinatesWithinImageResult, imageSegmentStart, imageSegmentEnd = allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, imageSize)
 			if(allFilterCoordinatesWithinImageResult):
-				for RFFiltersProperties in RFFiltersPropertiesList2:
+				for RFFilterIndex, RFFiltersProperties in enumerate(RFFiltersPropertiesList2):
 					RFProperties = copy.deepcopy(RFFiltersProperties)
 					RFProperties.centerCoordinates = centerCoordinates
+					RFProperties.filterIndex = RFFilterIndex
 					RFPropertiesList2.append(RFProperties)
 
 	#verify these match:
@@ -426,19 +434,19 @@ def applyRFFilters(resolutionIndex, inputImageSegments, RFFiltersTensor, numberO
 	return filterApplicationResultList, RFPropertiesList2	#filterApplicationResultThreshold
 				
 
-def findNeuron(ATORneuronAllLayers, resolutionIndex, RFProperties):
+def findNeuron(ATORneuronListAllLayers, resolutionIndex, RFProperties):
 	result = False
 	neuronFound = None
 	if(resolutionIndex > resolutionIndexFirst):
 		resolutionIndexParent = resolutionIndex-1
-		for ATORneuronList in ATORneuronListAllLayers[resolutionIndexParent]:
-			for neuron in ATORneuronList:
-				#detect if RFProperties lies within RFPropertiesParent
-				#CHECKTHIS: for now just use simple centroid detection algorithm
-				ellipseCentroidOverlapsesWithParent = ATORtf_ellipseProperties.centroidOverlapsEllipse(RFProperties, neuron.RFProperties)
-				if(ellipseCentroidOverlapsesWithParent):
-					result = True
-					neuronFound = neuron	
+		ATORneuronList = ATORneuronListAllLayers[resolutionIndexParent]
+		for neuron in ATORneuronList:
+			#detect if RFProperties lies within RFPropertiesParent
+			#CHECKTHIS: for now just use simple centroid detection algorithm
+			ellipseCentroidOverlapsesWithParent = ATORtf_ellipseProperties.centroidOverlapsEllipse(RFProperties, neuron.RFProperties)
+			if(ellipseCentroidOverlapsesWithParent):
+				result = True
+				neuronFound = neuron	
 	return result, neuronFound 
 						
 def normaliseRFProperties(RFProperties):
@@ -467,44 +475,44 @@ def generateRFTransformedProperties(neuronComponent, RFPropertiesParent):
 		
 def generateRFTransformedProperties2D(neuronComponent, RFPropertiesParent):
 	RFTransformedProperties = copy.copy(neuronComponent.RFProperties)
-	RFTransformedProperties.centerCoordinates = transformPoint2D(neuronComponent.centerCoordinates, RFPropertiesParent)
+	RFTransformedProperties.centerCoordinates = transformPoint2D(neuronComponent.RFProperties.centerCoordinates, RFPropertiesParent)
 	endCoordinates = calculateEndCoordinatesPosition2D(neuronComponent)
 	endCoordinates = transformPoint2D(endCoordinates, RFPropertiesParent)
-	RFTransformedProperties.axesLength = calculateDistance2D(RFTransformedProperties.centerCoordinates, endCoordinates)
-	RFTransformedProperties.angle = neuronComponent.angle-RFPropertiesParent.angle
+	RFTransformedProperties.axesLength = ATORtf_operations.calculateDistance2D(RFTransformedProperties.centerCoordinates, endCoordinates)
+	RFTransformedProperties.angle = neuronComponent.RFProperties.angle-RFPropertiesParent.angle
 	return RFTransformedProperties
 		
 def generateRFTransformedProperties3D(neuronComponent, RFPropertiesParent):
 	RFTransformedProperties = copy.copy(neuronComponent.RFProperties)
-	RFTransformedProperties.centerCoordinates = transformPoint3D(neuronComponent.centerCoordinates, RFPropertiesParent)
+	RFTransformedProperties.centerCoordinates = transformPoint3D(neuronComponent.RFProperties.centerCoordinates, RFPropertiesParent)
 	endCoordinates = calculateEndCoordinatesPosition3D(neuronComponent)
 	endCoordinates = transformPoint3D(endCoordinates, RFPropertiesParent)
-	RFTransformedProperties.axesLength = calculateDistance3D(RFTransformedProperties.centerCoordinates, endCoordinates)
-	RFTransformedProperties.angle = ((neuronComponent.angle[0]-RFPropertiesParent.angle[0]), (neuronComponent.angle[1]-RFPropertiesParent.angle[1]))
+	RFTransformedProperties.axesLength = ATORtf_operations.calculateDistance3D(RFTransformedProperties.centerCoordinates, endCoordinates)
+	RFTransformedProperties.angle = ((neuronComponent.RFProperties.angle[0]-RFPropertiesParent.angle[0]), (neuronComponent.RFProperties.angle[1]-RFPropertiesParent.angle[1]))
 	return RFTransformedProperties
 
 def transformPoint2D(coordinates, RFPropertiesParent):
 	coordinatesTransformed = (coordinates[0]-RFPropertiesParent.centerCoordinates[0], coordinates[1]-RFPropertiesParent.centerCoordinates[1])
-	coordinatesRelativeAfterRotation = ATORtf_operations.calculateRelativePosition2D(RFPropertiesParent.angle, RFPropertiesParent.axisLength[0])
+	coordinatesRelativeAfterRotation = ATORtf_operations.calculateRelativePosition2D(RFPropertiesParent.angle, RFPropertiesParent.axesLength[0])
 	coordinatesTransformed = (coordinatesTransformed[0]-coordinatesRelativeAfterRotation[0], coordinatesTransformed[1]-coordinatesRelativeAfterRotation[1])	#CHECKTHIS: + or -
 	coordinatesTransformed = (coordinates[0]/RFPropertiesParent.axesLength[0], coordinates[1]/RFPropertiesParent.axesLength[1])
 	return coordinatesTransformed
 	
 def transformPoint3D(coordinates, RFPropertiesParent):
 	coordinatesTransformed = (coordinates[0]-RFPropertiesParent.centerCoordinates[0], coordinates[1]-RFPropertiesParent.centerCoordinates[1], coordinates[2]-RFPropertiesParent.centerCoordinates[2])
-	coordinatesRelativeAfterRotation = ATORtf_operations.calculateRelativePosition3D(RFPropertiesParent.angle, RFPropertiesParent.axisLength[0])
+	coordinatesRelativeAfterRotation = ATORtf_operations.calculateRelativePosition3D(RFPropertiesParent.angle, RFPropertiesParent.axesLength[0])
 	coordinatesTransformed = (coordinatesTransformed[0]-coordinatesRelativeAfterRotation[0], coordinatesTransformed[1]-coordinatesRelativeAfterRotation[1], coordinatesTransformed[2]-coordinatesRelativeAfterRotation[2])	#CHECKTHIS: + or -
 	coordinatesTransformed = (coordinates[0]/RFPropertiesParent.axesLength[0], coordinates[1]/RFPropertiesParent.axesLength[1], coordinates[2]/RFPropertiesParent.axesLength[2])
 	return coordinatesTransformed
 		
 def calculateEndCoordinatesPosition2D(neuronComponent):
-	endCoordinatesRelativeToCentreCoordinates = ATORtf_operations.calculateRelativePosition2D(neuronComponent.angle, neuronComponent.axisLength[0])
-	endCoordinates = (neuronComponent.centerCoordinates[0]+endCoordinatesRelativeToCentreCoordinates[0], neuronComponent.centerCoordinates[1]+endCoordinatesRelativeToCentreCoordinates[1])	#CHECKTHIS: + or -
+	endCoordinatesRelativeToCentreCoordinates = ATORtf_operations.calculateRelativePosition2D(neuronComponent.RFProperties.angle, neuronComponent.RFProperties.axesLength[0])
+	endCoordinates = (neuronComponent.RFProperties.centerCoordinates[0]+endCoordinatesRelativeToCentreCoordinates[0], neuronComponent.RFProperties.centerCoordinates[1]+endCoordinatesRelativeToCentreCoordinates[1])	#CHECKTHIS: + or -
 	return endCoordinates
 	
 def calculateEndCoordinatesPosition3D(neuronComponent):
-	endCoordinatesRelativeToCentreCoordinates = ATORtf_operations.calculateRelativePosition3D(neuronComponent.angle, neuronComponent.axisLength)
-	endCoordinates = (neuronComponent.centerCoordinates[0]+endCoordinatesRelativeToCentreCoordinates[0], neuronComponent.centerCoordinates[1]+endCoordinatesRelativeToCentreCoordinates[1], neuronComponent.centerCoordinates[2]+endCoordinatesRelativeToCentreCoordinates[2])	#CHECKTHIS: + or -
+	endCoordinatesRelativeToCentreCoordinates = ATORtf_operations.calculateRelativePosition3D(neuronComponent.RFProperties.angle, neuronComponent.RFProperties.axesLength)
+	endCoordinates = (neuronComponent.RFProperties.centerCoordinates[0]+endCoordinatesRelativeToCentreCoordinates[0], neuronComponent.RFProperties.centerCoordinates[1]+endCoordinatesRelativeToCentreCoordinates[1], neuronComponent.RFProperties.centerCoordinates[2]+endCoordinatesRelativeToCentreCoordinates[2])	#CHECKTHIS: + or -
 	return endCoordinates
 
 def normaliseRFFilter(RFFilter, RFProperties):
@@ -516,7 +524,7 @@ def normaliseRFFilter(RFFilter, RFProperties):
 def transformRFFilterTF(RFFilter, RFPropertiesParent):
 	if(RFPropertiesParent.numberOfDimensions == 2):
 		centerCoordinates = [-RFPropertiesParent.centerCoordinates[0], -RFPropertiesParent.centerCoordinates[1]]
-		axesLength = [1.0/RFPropertiesParent.axesLength[0], 1.0/RFPropertiesParent.axesLength[1]]
+		axesLength = 1.0/RFPropertiesParent.axesLength[0]	#[1.0/RFPropertiesParent.axesLength[0], 1.0/RFPropertiesParent.axesLength[1]]
 		angle = -RFPropertiesParent.angle
 		RFFilterTransformed = transformRFFilterTF2D(RFFilter, centerCoordinates, axesLength, angle)
 	elif(RFPropertiesParent.numberOfDimensions == 3):
@@ -528,15 +536,24 @@ def transformRFFilterTF2D(RFFilter, centerCoordinates, axesLength, angle):
 	#CHECKTHIS: 2D code only;
 	#RFFilterTransformed = tf.expand_dims(RFFilterTransformed, 0)	#add extra dimension for num_images
 	RFFilterTransformed = RFFilter
-	print("RFFilter.shape = ", RFFilter.shape)
 	angleRadians =  ATORtf_operations.convertDegreesToRadians(angle)
-	print("angleRadians = ", angleRadians)
-	print("RFFilterTransformed.shape = ", RFFilterTransformed.shape)
-	RFFilterTransformed = tfa.image.rotate(RFFilterTransformed, angleRadians)		#https://www.tensorflow.org/addons/api_docs/python/tfa/image/rotate
-	RFFilterTransformed = tfa.image.translate(RFFilterTransformed, centerCoordinates)		#https://www.tensorflow.org/addons/api_docs/python/tfa/image/translate
-	RFFilterTransformed = tf.image.resize(RFFilterTransformed, axesLength)	#https://www.tensorflow.org/api_docs/python/tf/image/resize
+	RFFilterTransformed = tfa.image.rotate(RFFilterTransformed, angleRadians, fill_value=RFFilterImageTransformFillValue)		#https://www.tensorflow.org/addons/api_docs/python/tfa/image/rotate
+	centerCoordinatesList = [float(x) for x in list(centerCoordinates)]
+	RFFilterTransformed = tfa.image.translate(RFFilterTransformed, centerCoordinatesList, fill_value=RFFilterImageTransformFillValue)		#fill_value=RFFilterImageTransformFillValue	#https://www.tensorflow.org/addons/api_docs/python/tfa/image/translate
+	#print("axesLength = ", axesLength)	
+	#print("RFFilterTransformed.shape = ", RFFilterTransformed.shape)	
+	RFFilterTransformed = imageScale(RFFilterTransformed, axesLength)	#https://www.tensorflow.org/api_docs/python/tf/image/resize
+	#print("RFFilterTransformed.shape = ", RFFilterTransformed.shape)	
 	RFFilterTransformed = tf.squeeze(RFFilterTransformed)
 	return RFFilterTransformed
+
+def imageScale(img, scaleFactor):
+	a0 = scaleFactor
+	b1 = scaleFactor
+	scaleMatrix = [a0, 0.0, 0.0, 0.0, b1, 0.0, 0.0, 0.0]
+	transformedImage = tfa.image.transform(img, scaleMatrix)
+	return transformedImage
+
 		
 def rotateRFFilterTF(RFFilter, RFProperties):
 	return rotateRFFilterTF(-RFProperties.angle)
@@ -547,7 +564,7 @@ def rotateRFFilterTF(RFFilter, angle):
 
 
 def getFilterDimensions(resolutionIndex):
-	resolutionFactor, resolutionFactorReverse, imageSize = getImageDimensionsR(resolutionIndex)
+	resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase)
 	#reduce max size of ellipse at each res
 	axesLengthMax1 = int(imageSize[0]//resolutionFactorReverse * 1 / 2)	#CHECKTHIS
 	axesLengthMax2 = int(imageSize[1]//resolutionFactorReverse * 1 / 2)	#CHECKTHIS
@@ -560,18 +577,6 @@ def getFilterDimensions(resolutionIndex):
 	#print("axesLengthMax = ", axesLengthMax)
 	
 	return resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize	
-	
-def getImageDimensionsR(resolutionIndex):
-
-	resolutionIndexReverse = numberOfResolutions-resolutionIndex+1
-	resolutionFactor = 2**resolutionIndexReverse
-	resolutionFactorReverse = 2**resolutionIndex
-	resolutionFactorInverse = 1.0/(resolutionFactor)
-	#print("resolutionIndex = ", resolutionIndex, ", resolutionFactor = ", resolutionFactor)
-
-	imageSize = (int(imageWidthBase*resolutionFactorInverse), int(imageHeightBase*resolutionFactorInverse))
-	
-	return resolutionFactor, resolutionFactorReverse, imageSize
 
 def allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, imageSize):
 	result = False

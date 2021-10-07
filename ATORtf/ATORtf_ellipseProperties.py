@@ -36,6 +36,7 @@ class EllipseProperties():	#or EllipsoidProperties
 		self.colour = colour
 		self.isColourFilter = True
 		self.numberOfDimensions = 2	#currently only support 2D data (not ellipses in 3D space or ellipsoids in 3D space)
+		self.filterIndex = None
 		#self.centerCoordinates = (-1, -1)
 		#self.axesLength = (-1, -1)
 		#self.angle = -1

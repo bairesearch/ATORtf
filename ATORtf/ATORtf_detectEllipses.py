@@ -33,6 +33,8 @@ import ATORtf_operations
 import ATORtf_ellipseProperties
 
 
+resolutionIndexFirst = 1
+
 numberOfResolutions = 6	#x; lowest res sample: 1/(2^x)
 minimumEllipseLength = 2
 ellipseCenterCoordinatesResolution = 1	#pixels (at resolution r)
@@ -48,16 +50,15 @@ def detectEllipsesGaussianBlur(inputimagefilename):
 	print("inputImageHeight = ", inputImageHeight, "inputImageWidth = ", inputImageWidth, ", inputImageChannels = ", inputImageChannels)
 	blankArray = np.full((inputImageHeight, inputImageWidth, 3), 255, np.uint8)
 	outputImage = blankArray
-	
+		
 	ellipsePropertiesOptimumNormalisedAllRes = []
 	
 	testEllipseIndex = 0
 	
-	for resolutionIndex in range(1, numberOfResolutions):
-	
-		resolutionIndexReverse = numberOfResolutions-resolutionIndex+1
-		resolutionFactor = 2**resolutionIndexReverse
+	for resolutionIndex in range(resolutionIndexFirst, numberOfResolutions):
 		
+		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, inputImageWidth, inputImageHeight)
+	
 		#gaussianBlurKernelSize = (resolutionIndexReverse*2) - 1		
 		gaussianBlurKernelSize = (resolutionFactor*2) - 1	#ensure kernel size is odd
 		print("gaussianBlurKernelSize = ", gaussianBlurKernelSize)
@@ -81,12 +82,12 @@ def detectEllipsesGaussianBlur(inputimagefilename):
 		
 		minimumArea = 500
 		
-		inputImageRdev = copy.deepcopy(inputImageR) 
+		inputImageRdev = copy.deepcopy(inputImageR)
 		cv2.drawContours(inputImageRdev, contours, -1, (0, 255, 0), 3)
 		
 		for cnt in contours:
 			area = cv2.contourArea(cnt)
-			if area > minimumArea:
+			if(area > minimumArea):
 				print("cnt")
 				averageColour = calculateAverageColourOfContour(inputImageR, cnt)
 				ellipse = cv2.fitEllipse(cnt)
@@ -109,9 +110,8 @@ def detectEllipsesTrialResize(inputimagefilename):
 	
 	for resolutionIndex in range(1, numberOfResolutions):
 	
-		resolutionIndexReverse = numberOfResolutions-resolutionIndex+1
-		resolutionFactor = 2**resolutionIndexReverse
-		resolutionFactorReverse = 2**resolutionIndex
+		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, inputImageWidth, inputImageHeight)
+
 		resolutionFactorInverse = 1.0/(resolutionFactor)
 		#print("resolutionIndex = ", resolutionIndex, ", resolutionFactor = ", resolutionFactor)
 		inputImageR = cv2.resize(inputImage, None, fx=resolutionFactorInverse, fy=resolutionFactorInverse)

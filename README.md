@@ -24,16 +24,16 @@ MIT License
 
 ### Installation
 ```
-conda create -n ATORtf python=3
+conda create -n ATORtf python=3.9
 source activate ATORtf
+pip install tensorflow-gpu==2.6
 conda install --file condaRequirements.txt
-	where requirements.txt contains;
+	where condaRequirements.txt contains;
 		numpy
-		tensorflow
 		click
-		opencv
 		pillow
-conda install -c esri tensorflow-addons
+pip install tensorflow-addons
+pip install opencv-python opencv-contrib-python
 
 ```
 

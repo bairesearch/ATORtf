@@ -20,11 +20,13 @@ ATORtf Operations
 
 import tensorflow as tf
 import os
+import numpy as np
 import cv2
 import math
 from PIL import Image
 
 opencvVersion = 3	#or 4
+
 
 def modifyTuple(t, index, value):
 	lst = list(t)
@@ -91,16 +93,18 @@ def rotatePointNP2D(origin, point, angle):
 	return qx, qy
 
 def calculateDistance2D(point1, point2):
-	point_a = np.array((point1[0],point1[1]))
-	point_b = np.array((point2[0],point2[1]))
-	return calculateDistanceNP(point1, point2)
+	point_a = np.array((point1[0], point1[1]))
+	point_b = np.array((point2[0], point2[1]))
+	return calculateDistanceNP(point_a, point_b)
 	
 def calculateDistance3D(point1, point2):
-	point_a = np.array((point1[0],point1[1],point1[2]))
-	point_b = np.array((point2[0],point2[1],point2[2]))
-	return calculateDistanceNP(point1, point2)
+	point_a = np.array((point1[0], point1[1], point1[2]))
+	point_b = np.array((point2[0], point2[1], point2[2]))
+	return calculateDistanceNP(point_a, point_b)
 	
 def calculateDistanceNP(point1, point2):
+	#point1NP = np.asarray(point1)
+	#point2NP = np.asarray(point2)
 	distance = np.linalg.norm(point1 - point2)
 	return distance
 
@@ -114,8 +118,22 @@ def calculateRelativePosition2D(angle, hyp):
 	#opp (x) = sin(theta)*hyp
 	#adj (y) = cos(theta)*hyp 
 	
-	hyp = axisLength[0]
 	theta = convertDegreesToRadians(angle)
 	relativePosition2D = (math.sin(theta)*hyp, math.cos(theta)*hyp)
 	return relativePosition2D
-		
+
+def getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase):
+
+	#for ATORtf_detectEllipses:
+	resolutionIndexReverse = numberOfResolutions-resolutionIndex+resolutionIndexFirst	#CHECKTHIS
+	resolutionFactor = 2**resolutionIndexReverse
+	
+	#for ATORtf:
+	resolutionFactorReverse = 2**(resolutionIndex+1-resolutionIndexFirst)	#CHECKTHIS
+	resolutionFactorInverse = 1.0/(resolutionFactor)
+	#print("resolutionIndex = ", resolutionIndex, ", resolutionFactor = ", resolutionFactor)
+
+	imageSize = (int(imageWidthBase*resolutionFactorInverse), int(imageHeightBase*resolutionFactorInverse))
+	
+	return resolutionFactor, resolutionFactorReverse, imageSize
+			
