@@ -136,4 +136,9 @@ def getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutio
 	imageSize = (int(imageWidthBase*resolutionFactorInverse), int(imageHeightBase*resolutionFactorInverse))
 	
 	return resolutionFactor, resolutionFactorReverse, imageSize
-			
+
+def isTensorEmpty(tensor):
+	#https://github.com/tensorflow/tensorflow/issues/38976 : https://stackoverflow.com/questions/50529309/how-to-check-if-a-tensor-is-empty-in-tensorflow
+	is_empty = tf.equal(tf.size(tensor), 0)
+	return is_empty
+				

@@ -62,6 +62,8 @@ debugSaveRFFilters = True	#only RF properties are required to be saved by ATOR a
 if(debugSaveRFFilters):
 	RFFilterImageTransformFillValue = 0.0
 
+storeRFFiltersValuesAsFractions = True	#store RFFilters values as fractions (multipliers) rather than colours (additive)
+		
 resolutionIndexFirst = 0	#mandatory
 numberOfResolutions = 5	#x; lowest res sample: 1/(2^x)
 minimumEllipseLength = 2
@@ -69,7 +71,10 @@ ellipseCenterCoordinatesResolution = 1	#pixels (at resolution r)
 ellipseAxesLengthResolution = 1	#pixels (at resolution r)
 ellipseAngleResolution = 30	#degrees
 ellipseColourResolution = 64	#bits
-minimumFilterRequirement = 1.0	#CHECKTHIS: calibrate
+minimumFilterRequirement = 1.5	#CHECKTHIS: calibrate	#matched values fraction	#theoretical value: 0.95
+
+rgbMaxValue = 255.0
+rgbNumChannels = 3
 
 receptiveFieldOpponencyArea = 2.0	#the radius of the opponency/negative (-1) receptive field compared to the additive (+) receptive field
 
@@ -126,9 +131,9 @@ def createRFhierarchyAccelerated(inputimagefilename):
 	
 	#generateRFFilters:
 	if(debugLowIterations):
-		resolutionIndexMax = 2
+		resolutionIndexMax = 1
 	else:
-		resolutionIndexMax = numberOfResolutions+1
+		resolutionIndexMax = numberOfResolutions
 	
 	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
 		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase)
@@ -148,6 +153,7 @@ def createRFhierarchyAccelerated(inputimagefilename):
 		
 	#applyRFFilters:
 	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
+		print("resolutionIndex = ", resolutionIndex)
 		inputImageRGBSegments = inputImageRGBSegmentsAllRes[resolutionIndex]
 		inputImageGraySegments = inputImageGraySegmentsAllRes[resolutionIndex]
 		RFFiltersList = RFFiltersListAllRes[resolutionIndex]
@@ -174,6 +180,9 @@ def generateImageSegments(resolutionIndex, inputImageRGBTF, inputImageGrayTF):
 			if(allFilterCoordinatesWithinImageResult):
 				inputImageRGBSegment = inputImageRGBTF[imageSegmentStart[0]:imageSegmentEnd[0], imageSegmentStart[1]:imageSegmentEnd[1], :]
 				inputImageGraySegment = inputImageGrayTF[imageSegmentStart[0]:imageSegmentEnd[0], imageSegmentStart[1]:imageSegmentEnd[1], :]
+				if(storeRFFiltersValuesAsFractions):
+					inputImageRGBSegment = tf.divide(inputImageRGBSegment, rgbMaxValue)
+					inputImageGraySegment = tf.divide(inputImageGraySegment, rgbMaxValue)
 				inputImageRGBSegmentsList.append(inputImageRGBSegment)
 				inputImageGraySegmentsList.append(inputImageGraySegment)
 			
@@ -196,19 +205,19 @@ def generateRFFilters(resolutionIndex):
 	
 	#magnocellular filters (monochromatic);
 	colourH = (255, 255, 255)	#high
-	colourL = (000, 000, 000)	#low
+	colourL = (-255, -255, -255)	#low
 	RFFiltersHL, RFPropertiesHL = generateRotationalInvariantRFFilters(resolutionIndex, False, colourH, colourL)
 	RFFiltersLH, RFPropertiesLH = generateRotationalInvariantRFFilters(resolutionIndex, False, colourL, colourH)
 	
 	#parvocellular/koniocellular filters (based on 2 cardinal colour axes; ~red-~green, ~blue-~yellow);
-	colourR = (255, -255, 0)	#red+, green-
-	colourG = (-255, 255, 0)	#green+, red-
-	colourB = (-127, -127, 255)	#blue+, yellow-
-	colourY = (127, 127, -255)	#yellow+, blue-
-	RFFiltersRG, RFPropertiesRG = generateRotationalInvariantRFFilters(resolutionIndex, True, colourR, colourG)
-	RFFiltersGR, RFPropertiesGR = generateRotationalInvariantRFFilters(resolutionIndex, True, colourG, colourR)
-	RFFiltersBY, RFPropertiesBY = generateRotationalInvariantRFFilters(resolutionIndex, True, colourB, colourY)
-	RFFiltersYB, RFPropertiesYB = generateRotationalInvariantRFFilters(resolutionIndex, True, colourY, colourB)
+	colourRmG = (255, -255, 0)	#red+, green-
+	colourGmR = (-255, 255, 0)	#green+, red-
+	colourBmY = (-127, -127, 255)	#blue+, yellow-
+	colourYmB = (127, 127, -255)	#yellow+, blue-
+	RFFiltersRG, RFPropertiesRG = generateRotationalInvariantRFFilters(resolutionIndex, True, colourRmG, colourGmR)
+	RFFiltersGR, RFPropertiesGR = generateRotationalInvariantRFFilters(resolutionIndex, True, colourGmR, colourRmG)
+	RFFiltersBY, RFPropertiesBY = generateRotationalInvariantRFFilters(resolutionIndex, True, colourBmY, colourYmB)
+	RFFiltersYB, RFPropertiesYB = generateRotationalInvariantRFFilters(resolutionIndex, True, colourYmB, colourBmY)
 	
 	RFFiltersList.append(RFFiltersHL)
 	RFFiltersList.append(RFFiltersLH)
@@ -302,43 +311,52 @@ def generateRFFilter(resolutionIndex, isColourFilter, RFPropertiesInside, RFProp
 	ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageOutside, RFPropertiesOutsideWhite)
 	ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageOutside, RFPropertiesInsideBlack)
 	
-	inputImageTF = tf.convert_to_tensor(ellipseFilterImageInside, dtype=tf.float32)	#bool
-	inputImageTF = tf.greater(inputImageTF, 0.0)
-	inputImageTF = tf.dtypes.cast(inputImageTF, tf.float32)
+	insideImageTF = tf.convert_to_tensor(ellipseFilterImageInside, dtype=tf.float32)	#bool
+	insideImageTF = tf.greater(insideImageTF, 0.0)
+	insideImageTF = tf.dtypes.cast(insideImageTF, tf.float32)
 	
 	outsideImageTF = tf.convert_to_tensor(ellipseFilterImageOutside, dtype=tf.float32)
 	outsideImageTF = tf.greater(outsideImageTF, 0.0)
 	outsideImageTF = tf.dtypes.cast(outsideImageTF, tf.float32)
-	outsideImageTF = tf.math.negative(outsideImageTF)
-	
-	#print(inputImageTF.shape)
-	#print(outsideImageTF.shape)
-			
+
+	#print("insideImageTF = ", insideImageTF)
+	#print("outsideImageTF = ", outsideImageTF)
+		
 	#add colour channels;
-	#inputImageTF = tf.expand_dims(inputImageTF, axis=2)
+	#insideImageTF = tf.expand_dims(insideImageTF, axis=2)
 	multiples = tf.constant([1,1,3], tf.int32)	#for 2D data only
-	inputImageTF = tf.tile(inputImageTF, multiples)
-	#print(inputImageTF.shape)
-	RFColourInside = tf.constant([RFPropertiesInside.colour[0], RFPropertiesInside.colour[1], RFPropertiesInside.colour[2]], dtype=tf.float32)
+	insideImageTF = tf.tile(insideImageTF, multiples)
+	#print(insideImageTF.shape)
+	RFColourInside = tf.Variable([RFPropertiesInside.colour[0], RFPropertiesInside.colour[1], RFPropertiesInside.colour[2]], dtype=tf.float32)
 	RFColourInside = ATORtf_operations.expandDimsN(RFColourInside, RFPropertiesInside.numberOfDimensions, axis=0)
-	inputImageTF = tf.multiply(inputImageTF, RFColourInside)
+	insideImageTF = tf.multiply(insideImageTF, RFColourInside)
 	
 	#outsideImageTF = tf.expand_dims(outsideImageTF, axis=2)
 	multiples = tf.constant([1,1,3], tf.int32)	#for 2D data only
 	outsideImageTF = tf.tile(outsideImageTF, multiples)
 	#print(outsideImageTF.shape)
-	RFColourOutside = tf.constant([RFPropertiesOutside.colour[0], RFPropertiesOutside.colour[1], RFPropertiesOutside.colour[2]], dtype=tf.float32)
+	RFColourOutside = tf.Variable([RFPropertiesOutside.colour[0], RFPropertiesOutside.colour[1], RFPropertiesOutside.colour[2]], dtype=tf.float32)
 	RFColourOutside = ATORtf_operations.expandDimsN(RFColourOutside, RFPropertiesOutside.numberOfDimensions, axis=0)
 	outsideImageTF = tf.multiply(outsideImageTF, RFColourOutside)
-
+	
+	#print("RFColourInside = ", RFColourInside)
+	#print("RFColourOutside = ", RFColourOutside)
+	#print("insideImageTF = ", insideImageTF)
+	#print("outsideImageTF = ", outsideImageTF)
+	
 	#print(RFColourInside.shape)
 	#print(RFColourOutside.shape)
-	#print(inputImageTF.shape)
+	#print(insideImageTF.shape)
 	#print(outsideImageTF.shape)
 		
 	RFFilterTF = tf.convert_to_tensor(blankArray, dtype=tf.float32)
-	RFFilterTF = tf.add(RFFilterTF, inputImageTF)
+	RFFilterTF = tf.add(RFFilterTF, insideImageTF)
 	RFFilterTF = tf.add(RFFilterTF, outsideImageTF)
+	
+	if(storeRFFiltersValuesAsFractions):
+		RFFilterTF = tf.divide(RFFilterTF, rgbMaxValue)
+
+	#print("RFFilterTF = ", RFFilterTF)
 	
 	if(not isColourFilter):
 		RFFilterTF = tf.image.rgb_to_grayscale(RFFilterTF)
@@ -347,7 +365,7 @@ def generateRFFilter(resolutionIndex, isColourFilter, RFPropertiesInside, RFProp
 	
 def applyRFFiltersList(resolutionIndex, inputImageRGBSegments, inputImageGraySegments, RFFiltersList, RFFiltersPropertiesList, ATORneuronListAllLayers):
 	
-	print("applyRFFiltersList: resolutionIndex = ", resolutionIndex)
+	print("\tapplyRFFiltersList: resolutionIndex = ", resolutionIndex)
 	
 	ATORneuronList = []	#for resolutionIndex
 	
@@ -368,28 +386,30 @@ def applyRFFiltersList(resolutionIndex, inputImageRGBSegments, inputImageGraySeg
 		isColourFilter = RFFiltersPropertiesList2[0].isColourFilter
 		numberOfDimensions = RFFiltersPropertiesList2[0].numberOfDimensions
 		if(isColourFilter):
-			filterApplicationResultList, RFPropertiesList2 = applyRFFilters(resolutionIndex, inputImageRGBSegments, RFFiltersTensor, numberOfDimensions, RFFiltersPropertiesList2)		
+			filterApplicationResultThresholdIndicesList, filterApplicationResultThresholdedList, RFPropertiesList2 = applyRFFilters(resolutionIndex, inputImageRGBSegments, RFFiltersTensor, numberOfDimensions, RFFiltersPropertiesList2)		
 		else:
-			filterApplicationResultList, RFPropertiesList2 = applyRFFilters(resolutionIndex, inputImageGraySegments, RFFiltersTensor, numberOfDimensions, RFFiltersPropertiesList2)
+			filterApplicationResultThresholdIndicesList, filterApplicationResultThresholdedList, RFPropertiesList2 = applyRFFilters(resolutionIndex, inputImageGraySegments, RFFiltersTensor, numberOfDimensions, RFFiltersPropertiesList2)
+			
+		print("ATORneuronList append: len(filterApplicationResultThresholdIndicesList) = ", len(filterApplicationResultThresholdIndicesList))	
+		for RFthresholdedListIndex2, RFlistIndex2 in enumerate(filterApplicationResultThresholdIndicesList):
 				
-		for RFlistIndex2, filterApplicationResult in enumerate(filterApplicationResultList):
-			if(filterApplicationResult > minimumFilterRequirement):
-				
-				RFProperties = RFPropertiesList2[RFlistIndex2]
-				RFFilter = None
-				if(debugSaveRFFilters):
-					RFFilter = RFFiltersTensor[RFProperties.filterIndex]	#not required
-					
-				#create child neuron:
-				neuron = ATORneuron(resolutionIndex, RFProperties, RFFilter)
-				ATORneuronList.append(neuron)
-				
-				#add to parent neuron:
-				foundParentNeuron, parentNeuron = findNeuron(ATORneuronListAllLayers, resolutionIndex, RFProperties)
-				if(foundParentNeuron):	
-					parentNeuron.neuronComponents.append(neuron)
-					normaliseRFComponentWRTparent(neuron, parentNeuron.RFProperties)
-					parentNeuron.neuronComponentsWeightsList.append(filterApplicationResult)
+			filterApplicationResult = filterApplicationResultThresholdedList[RFthresholdedListIndex2]
+
+			RFProperties = RFPropertiesList2[RFlistIndex2]
+			RFFilter = None
+			if(debugSaveRFFilters):
+				RFFilter = RFFiltersTensor[RFProperties.filterIndex]	#not required
+
+			#create child neuron:
+			neuron = ATORneuron(resolutionIndex, RFProperties, RFFilter)
+			ATORneuronList.append(neuron)
+
+			#add to parent neuron:
+			foundParentNeuron, parentNeuron = findNeuron(ATORneuronListAllLayers, resolutionIndex, RFProperties)
+			if(foundParentNeuron):	
+				parentNeuron.neuronComponents.append(neuron)
+				normaliseRFComponentWRTparent(neuron, parentNeuron.RFProperties)
+				parentNeuron.neuronComponentsWeightsList.append(filterApplicationResult)
 					
 	ATORneuronListAllLayers.append(ATORneuronList)
 	
@@ -398,7 +418,7 @@ def applyRFFilters(resolutionIndex, inputImageSegments, RFFiltersTensor, numberO
 	#perform convolution for each filter size;
 	resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize = getFilterDimensions(resolutionIndex)
 		
-	filterApplicationResultList = []
+	#filterApplicationResultList = []
 	RFPropertiesList2 = []
 
 	#print("RFFiltersPropertiesList2[0].isColourFilter = ", RFFiltersPropertiesList2[0].isColourFilter)
@@ -407,33 +427,93 @@ def applyRFFilters(resolutionIndex, inputImageSegments, RFFiltersTensor, numberO
 		
 	#inputImageSegments dim: num inputImageSegments, x, y, c
 	#RFFiltersTensor dim: num RFFilters, x, y, c
+	#print("inputImageSegments.shape = ", inputImageSegments.shape)
+	#print("RFFiltersTensor.shape = ", RFFiltersTensor.shape)
+	
 	inputImageSegmentsPixelsFlattened = tf.reshape(inputImageSegments, [inputImageSegments.shape[0], inputImageSegments.shape[1]*inputImageSegments.shape[2]*inputImageSegments.shape[3]])
 	RFFiltersTensorPixelsFlattened = tf.reshape(RFFiltersTensor, [RFFiltersTensor.shape[0], RFFiltersTensor.shape[1]*RFFiltersTensor.shape[2]*RFFiltersTensor.shape[3]])
 	
 	filterApplicationResult = tf.matmul(inputImageSegmentsPixelsFlattened, tf.transpose(RFFiltersTensorPixelsFlattened))	#dim: num inputImageSegments, num RFFilters
 	filterApplicationResult	= tf.reshape(filterApplicationResult, [filterApplicationResult.shape[0]*filterApplicationResult.shape[1]]) #flatten	#dim: num inputImageSegments * num RFFilters
+	#filterApplicationResultList.append(filterApplicationResult)
 	
-	filterApplicationResultNP = filterApplicationResult.numpy()	#verify 1D
-	filterApplicationResultList.extend(filterApplicationResultNP.tolist())
+	isColourFilter = RFFiltersPropertiesList2[0].isColourFilter
+	numberOfDimensions = RFFiltersPropertiesList2[0].numberOfDimensions
+	filterApplicationResultThreshold = calculateFilterApplicationResultThreshold(filterApplicationResult, minimumFilterRequirement, filterSize, isColourFilter, numberOfDimensions)
+	filterApplicationResultThresholdIndices = tf.where(filterApplicationResultThreshold)	#returns [n, 1] tensor
+	filterApplicationResultThresholdIndices = tf.squeeze(filterApplicationResultThresholdIndices, axis=1)
 	
-	for centerCoordinates1 in range(0, imageSize[0], ellipseCenterCoordinatesResolution):
-		for centerCoordinates2 in range(0, imageSize[1], ellipseCenterCoordinatesResolution):
-			centerCoordinates = (centerCoordinates1, centerCoordinates2)
-			allFilterCoordinatesWithinImageResult, imageSegmentStart, imageSegmentEnd = allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, imageSize)
-			if(allFilterCoordinatesWithinImageResult):
-				for RFFilterIndex, RFFiltersProperties in enumerate(RFFiltersPropertiesList2):
-					RFProperties = copy.deepcopy(RFFiltersProperties)
-					RFProperties.centerCoordinates = centerCoordinates
-					RFProperties.filterIndex = RFFilterIndex
-					RFPropertiesList2.append(RFProperties)
+	#print("filterApplicationResult = ", filterApplicationResult)
+	#print("filterApplicationResult.shape = ", filterApplicationResult.shape)
+	#print("filterApplicationResultThreshold.shape = ", filterApplicationResultThreshold.shape)
+	#print("filterApplicationResultThresholdIndices.shape = ", filterApplicationResultThresholdIndices.shape)
+	
+	if(not ATORtf_operations.isTensorEmpty(filterApplicationResultThresholdIndices)):
 
-	#verify these match:
-	#print("len(filterApplicationResultList) = ", len(filterApplicationResultList))
-	#print("len(RFPropertiesList2) = ", len(RFPropertiesList2))
+		filterApplicationResultThresholded = tf.gather(filterApplicationResult, filterApplicationResultThresholdIndices)
+		
+		#print("filterApplicationResultThresholded = ", filterApplicationResultThresholded)
+		#print("filterApplicationResultThresholded.shape = ", filterApplicationResultThresholded.shape)
+		
+		filterApplicationResultThresholdIndicesNP = filterApplicationResultThresholdIndices.numpy()	#verify 1D
+		filterApplicationResultThresholdIndicesList = filterApplicationResultThresholdIndicesNP.tolist()
+		filterApplicationResultThresholdedNP = filterApplicationResultThresholded.numpy()	#verify 1D
+		filterApplicationResultThresholdedList = filterApplicationResultThresholdedNP.tolist()
 
-	return filterApplicationResultList, RFPropertiesList2	#filterApplicationResultThreshold
-				
+		for centerCoordinates1 in range(0, imageSize[0], ellipseCenterCoordinatesResolution):
+			for centerCoordinates2 in range(0, imageSize[1], ellipseCenterCoordinatesResolution):
+				centerCoordinates = (centerCoordinates1, centerCoordinates2)
+				allFilterCoordinatesWithinImageResult, imageSegmentStart, imageSegmentEnd = allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, imageSize)
+				if(allFilterCoordinatesWithinImageResult):
+					for RFFilterIndex, RFFiltersProperties in enumerate(RFFiltersPropertiesList2):
+						RFProperties = copy.deepcopy(RFFiltersProperties)
+						RFProperties.centerCoordinates = centerCoordinates
+						RFProperties.filterIndex = RFFilterIndex
+						RFPropertiesList2.append(RFProperties)
 
+		#verify these match:
+		#print("len(filterApplicationResultThresholdedList) = ", len(filterApplicationResultThresholdedList))
+		#print("len(filterApplicationResultThresholdIndicesList) = ", len(filterApplicationResultThresholdIndicesList))
+		#print("len(RFPropertiesList2) = ", len(RFPropertiesList2))
+	else:
+		filterApplicationResultThresholdIndicesList = []
+		filterApplicationResultThresholdedList = []
+		
+	return filterApplicationResultThresholdIndicesList, filterApplicationResultThresholdedList, RFPropertiesList2	#filterApplicationResultList
+	
+def calculateFilterApplicationResultThreshold(filterApplicationResult, minimumFilterRequirement, filterSize, isColourFilter, numberOfDimensions):
+	
+	minimumFilterRequirementLocal = minimumFilterRequirement*calculateFilterPixels(filterSize, numberOfDimensions)
+	
+	#if(isColourFilter):
+	#	minimumFilterRequirementLocal = minimumFilterRequirementLocal*rgbNumChannels*rgbNumChannels	#CHECKTHIS	#not required as assume filter colours will be normalised to the maximum value of a single rgb channel? 
+	if(not storeRFFiltersValuesAsFractions):
+		minimumFilterRequirementLocal = minimumFilterRequirementLocal*(rgbMaxValue*rgbMaxValue)	#rgbMaxValue of both imageSegment and RFFilter 		
+
+	print("minimumFilterRequirementLocal = ", minimumFilterRequirementLocal)
+	print("tf.math.reduce_max(filterApplicationResult) = ", tf.math.reduce_max(filterApplicationResult))
+	
+	filterApplicationResultThreshold = tf.greater(filterApplicationResult, minimumFilterRequirementLocal)	
+	return filterApplicationResultThreshold
+
+def calculateFilterPixels(filterSize, numberOfDimensions):
+	internalFilterSize = getInternalFilterSize(filterSize, numberOfDimensions)	#CHECKTHIS: only consider contribution of positive (additive) pixels
+	#print("internalFilterSize = ", internalFilterSize)
+	
+	if(numberOfDimensions == 2):
+		numberOfFilterPixels = internalFilterSize[0]*internalFilterSize[1]
+	elif(numberOfDimensions == 3):
+		numberOfFilterPixels = internalFilterSize[0]*internalFilterSize[1]	#CHECKTHIS
+	#print("numberOfFilterPixels = ", numberOfFilterPixels)
+	return numberOfFilterPixels
+
+def getInternalFilterSize(filterSize, numberOfDimensions):
+	if(numberOfDimensions == 2):
+		internalFilterSize = (int(filterSize[0]/receptiveFieldOpponencyArea), int(filterSize[1]/receptiveFieldOpponencyArea))
+	elif(numberOfDimensions == 3):
+		internalFilterSize = (int(filterSize[0]/receptiveFieldOpponencyArea), int(filterSize[1]/receptiveFieldOpponencyArea))	#CHECKTHIS
+	return internalFilterSize
+	
 def findNeuron(ATORneuronListAllLayers, resolutionIndex, RFProperties):
 	result = False
 	neuronFound = None
