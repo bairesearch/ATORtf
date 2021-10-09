@@ -34,13 +34,11 @@ class EllipseProperties():	#or EllipsoidProperties
 		self.axesLength = axesLength
 		self.angle = angle
 		self.colour = colour
+		
 		self.isColourFilter = True
 		self.numberOfDimensions = 2	#currently only support 2D data (not ellipses in 3D space or ellipsoids in 3D space)
 		self.filterIndex = None
-		#self.centerCoordinates = (-1, -1)
-		#self.axesLength = (-1, -1)
-		#self.angle = -1
-		#self.colour = -1
+		self.imageSegmentIndex = None
 
 def drawEllipse(outputImage, ellipseProperties):
 	#https://docs.opencv.org/4.5.3/d6/d6e/group__imgproc__draw.html#ga28b2267d35786f5f890ca167236cbc69
