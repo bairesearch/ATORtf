@@ -122,7 +122,7 @@ def calculateRelativePosition2D(angle, hyp):
 	relativePosition2D = (math.sin(theta)*hyp, math.cos(theta)*hyp)
 	return relativePosition2D
 
-def getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase):
+def getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase):
 
 	#for ATORtf_detectEllipses:
 	resolutionIndexReverse = numberOfResolutions-resolutionIndex+resolutionIndexFirst	#CHECKTHIS
@@ -133,7 +133,7 @@ def getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutio
 	resolutionFactorInverse = 1.0/(resolutionFactor)
 	#print("resolutionIndex = ", resolutionIndex, ", resolutionFactor = ", resolutionFactor)
 
-	imageSize = (int(imageWidthBase*resolutionFactorInverse), int(imageHeightBase*resolutionFactorInverse))
+	imageSize = (int(imageSizeBase[0]*resolutionFactorInverse), int(imageSizeBase[1]*resolutionFactorInverse))
 	
 	return resolutionFactor, resolutionFactorReverse, imageSize
 

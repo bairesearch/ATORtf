@@ -78,8 +78,7 @@ rgbNumChannels = 3
 
 receptiveFieldOpponencyArea = 2.0	#the radius of the opponency/negative (-1) receptive field compared to the additive (+) receptive field
 
-imageWidthBase = 256	#maximum image resolution used by ATORtf algorithm	#CHECKTHIS
-imageHeightBase = 256 	#maximum image resolution used by ATORtf algorithm	#CHECKTHIS
+imageSizeBase = (256, 256)	#maximum image resolution used by ATORtf algorithm	#CHECKTHIS
 
 ellipseNormalisedAngle = 0.0
 ellipseNormalisedCentreCoordinates = 0.0 
@@ -92,7 +91,9 @@ class ATORneuron():
 		self.RFProperties = RFProperties
 		self.RFPropertiesNormalised = normaliseRFProperties(RFProperties)
 		self.RFPropertiesNormalisedWRTparent = None
+		self.RFPropertiesNormalisedGlobal = normaliseGlobalRFProperties(RFProperties)
 		if(debugSaveRFFiltersAndImageSegments):
+			self.RFFilter = RFFilter
 			self.RFFilterNormalised = normaliseRFFilter(RFFilter, RFProperties)
 			self.RFFilterNormalisedWRTparent = None
 			self.RFImage = RFImage
@@ -106,7 +107,7 @@ def createRFhierarchyAccelerated(inputimagefilename):
 	inputImage = cv2.imread(inputimagefilename)	#FUTURE: support 3D datasets
 	
 	#normalise image size
-	inputImage = cv2.resize(inputImage, (imageWidthBase, imageHeightBase))
+	inputImage = cv2.resize(inputImage, imageSizeBase)
 	inputImageRGB = cv2.cvtColor(inputImage, cv2.COLOR_BGR2RGB)
 	inputImageGray = cv2.cvtColor(inputImageRGB, cv2.COLOR_RGB2GRAY)
 	
@@ -138,10 +139,7 @@ def createRFhierarchyAccelerated(inputimagefilename):
 		resolutionIndexMax = numberOfResolutions
 	
 	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
-		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase)
-		print("resolutionFactor = ", resolutionFactor)
-		print("resolutionFactorReverse = ", resolutionFactorReverse)
-		print("imageSize = ", imageSize)
+		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase)
 		inputImageRGBTF = tf.image.resize(inputImageRGBTF, imageSize)
 		inputImageGrayTF = tf.image.resize(inputImageGrayTF, imageSize)
 		inputImageRGBSegments, inputImageGraySegments = generateImageSegments(resolutionIndex, inputImageRGBTF, inputImageGrayTF)
@@ -168,6 +166,15 @@ def generateImageSegments(resolutionIndex, inputImageRGBTF, inputImageGrayTF):
 	
 	resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize = getFilterDimensions(resolutionIndex)
 	
+	if(debugVerbose):
+		print("")
+		print("resolutionIndex = ", resolutionIndex)
+		print("resolutionFactor = ", resolutionFactor)
+		print("imageSize = ", imageSize)
+		print("filterRadius = ", filterRadius)
+		print("axesLengthMax = ", axesLengthMax)
+		print("filterSize = ", filterSize)
+			
 	#print("inputImageRGBTF.shape = ", inputImageRGBTF.shape)
 	#print("inputImageGrayTF.shape = ", inputImageGrayTF.shape)
 	
@@ -296,7 +303,7 @@ def generateRFFilter(resolutionIndex, isColourFilter, RFPropertiesInside, RFProp
 	# where "-" = -RFColourOutside [R G B], "+" = +RFColourInside [R G B], and "0" = [0, 0, 0]
 	
 	#generate ellipse on blank canvas
-	#resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase)
+	#resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase)
 	blankArray = np.full((RFPropertiesInside.imageSize[1], RFPropertiesInside.imageSize[0], 1), 0, np.uint8)	#grayscale (or black/white)	#0: black	#or filterSize
 	
 	ellipseFilterImageInside = copy.deepcopy(blankArray)
@@ -373,7 +380,7 @@ def applyRFFiltersList(resolutionIndex, inputImageRGBSegments, inputImageGraySeg
 	
 	ATORneuronList = []	#for resolutionIndex
 	
-	resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase)
+	resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase)
 	resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize = getFilterDimensions(resolutionIndex)
 
 	#print("imageSize = ", imageSize)
@@ -419,8 +426,9 @@ def applyRFFiltersList(resolutionIndex, inputImageRGBSegments, inputImageGraySeg
 				ATORneuronList.append(neuron)
 
 				#add to parent neuron:
-				foundParentNeuron, parentNeuron = findNeuron(ATORneuronListAllLayers, resolutionIndex, RFProperties)
+				foundParentNeuron, parentNeuron = findParentNeuron(ATORneuronListAllLayers, resolutionIndex, neuron)
 				if(foundParentNeuron):	
+					#print("foundParentNeuron")
 					parentNeuron.neuronComponents.append(neuron)
 					normaliseRFComponentWRTparent(neuron, parentNeuron.RFProperties)
 					parentNeuron.neuronComponentsWeightsList.append(filterApplicationResult)
@@ -548,21 +556,39 @@ def getInternalFilterSize(filterSize, numberOfDimensions):
 		internalFilterSize = (int(filterSize[0]/receptiveFieldOpponencyArea), int(filterSize[1]/receptiveFieldOpponencyArea))	#CHECKTHIS
 	return internalFilterSize
 	
-def findNeuron(ATORneuronListAllLayers, resolutionIndex, RFProperties):
-	result = False
-	neuronFound = None
+def findParentNeuron(ATORneuronListAllLayers, resolutionIndex, neuron):
+	foundParentNeuron = False
+	parentNeuron = None
 	if(resolutionIndex > resolutionIndexFirst):
-		resolutionIndexParent = resolutionIndex-1
-		ATORneuronList = ATORneuronListAllLayers[resolutionIndexParent]
-		for neuron in ATORneuronList:
+		resolutionIndexLower = resolutionIndex-1
+		ATORneuronList = ATORneuronListAllLayers[resolutionIndexLower]
+		for lowerNeuron in ATORneuronList:
 			#detect if RFProperties lies within RFPropertiesParent
 			#CHECKTHIS: for now just use simple centroid detection algorithm
-			ellipseCentroidOverlapsesWithParent = ATORtf_ellipseProperties.centroidOverlapsEllipse(RFProperties, neuron.RFProperties)
+			ellipseCentroidOverlapsesWithParent = ATORtf_ellipseProperties.centroidOverlapsEllipse(neuron.RFPropertiesNormalisedGlobal, lowerNeuron.RFPropertiesNormalisedGlobal)
 			if(ellipseCentroidOverlapsesWithParent):
-				result = True
-				neuronFound = neuron	
-	return result, neuronFound 
-						
+				foundParentNeuron = True
+				parentNeuron = lowerNeuron
+		if(not foundParentNeuron):	
+			#search for non-immediate (indirect) parent neuron:
+			foundParentNeuron, neuronFound = findParentNeuron(ATORneuronListAllLayers, resolutionIndexLower, neuron)
+	return foundParentNeuron, parentNeuron 
+	
+def normaliseGlobalRFProperties(RFProperties):
+	#normalise ellipse respect to original image size
+	RFPropertiesNormalisedGlobal = ATORtf_ellipseProperties.normaliseEllipseProperties(RFProperties)
+	return RFPropertiesNormalisedGlobal
+		
+	#RFPropertiesNormalisedGlobal = copy.deepcopy(RFProperties)
+	#resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize = getFilterDimensions(resolutionIndex)
+	#if(numberOfDimensions == 2):
+	#	RFPropertiesNormalisedGlobal.centerCoordinates = (RFProperties.centerCoordinates[0]*resolutionFactor, RFProperties.centerCoordinates[1]*resolutionFactor)
+	#	RFPropertiesNormalisedGlobal.axesLength = (RFProperties.centerCoordinates[0]*resolutionFactor, RFProperties.centerCoordinates[1]*resolutionFactor)
+	#elif(numberOfDimensions == 3):
+	#	RFPropertiesNormalisedGlobal.centerCoordinates = (RFProperties.centerCoordinates[0]*resolutionFactor, RFProperties.centerCoordinates[1]*resolutionFactor)	#CHECKTHIS
+	#	RFPropertiesNormalisedGlobal.axesLength = (RFProperties.axesLength[0]*resolutionFactor, RFProperties.axesLength[1]*resolutionFactor)	#CHECKTHIS
+
+					
 def normaliseRFProperties(RFProperties):
 	#normalise ellipse respect to major/minor ellipticity axis orientation (WRT self)
 	RFPropertiesNormalised = copy.deepcopy(RFProperties)
@@ -679,7 +705,7 @@ def rotateRFFilterTF(RFFilter, angle):
 
 
 def getFilterDimensions(resolutionIndex):
-	resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageWidthBase, imageHeightBase)
+	resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase)
 	#reduce max size of ellipse at each res
 	axesLengthMax1 = int(imageSize[0]//resolutionFactorReverse * 1 / 2)	#CHECKTHIS
 	axesLengthMax2 = int(imageSize[1]//resolutionFactorReverse * 1 / 2)	#CHECKTHIS

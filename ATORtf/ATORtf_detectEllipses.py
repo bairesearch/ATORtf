@@ -47,6 +47,7 @@ def detectEllipsesGaussianBlur(inputimagefilename):
 	inputImage = cv2.imread(inputimagefilename)
 		
 	inputImageHeight, inputImageWidth, inputImageChannels = inputImage.shape
+	inputImageSize = (inputImageWidth, inputImageHeight)
 	print("inputImageHeight = ", inputImageHeight, "inputImageWidth = ", inputImageWidth, ", inputImageChannels = ", inputImageChannels)
 	blankArray = np.full((inputImageHeight, inputImageWidth, 3), 255, np.uint8)
 	outputImage = blankArray
@@ -57,7 +58,7 @@ def detectEllipsesGaussianBlur(inputimagefilename):
 	
 	for resolutionIndex in range(resolutionIndexFirst, numberOfResolutions):
 		
-		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, inputImageWidth, inputImageHeight)
+		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, inputImageSize)
 	
 		#gaussianBlurKernelSize = (resolutionIndexReverse*2) - 1		
 		gaussianBlurKernelSize = (resolutionFactor*2) - 1	#ensure kernel size is odd
@@ -100,6 +101,7 @@ def detectEllipsesTrialResize(inputimagefilename):
 	inputImage = cv2.imread(inputimagefilename)
 		
 	inputImageHeight, inputImageWidth, inputImageChannels = inputImage.shape
+	inputImageSize = (inputImageWidth, inputImageHeight)
 	print("inputImageHeight = ", inputImageHeight, "inputImageWidth = ", inputImageWidth, ", inputImageChannels = ", inputImageChannels)
 	blankArray = np.full((inputImageHeight, inputImageWidth, 3), 255, np.uint8)
 	outputImage = blankArray
@@ -110,7 +112,7 @@ def detectEllipsesTrialResize(inputimagefilename):
 	
 	for resolutionIndex in range(1, numberOfResolutions):
 	
-		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, inputImageWidth, inputImageHeight)
+		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, inputImageSize)
 
 		resolutionFactorInverse = 1.0/(resolutionFactor)
 		#print("resolutionIndex = ", resolutionIndex, ", resolutionFactor = ", resolutionFactor)
