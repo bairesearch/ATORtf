@@ -7,7 +7,7 @@ Richard Bruce Baxter - Copyright (c) 2021 Baxter AI (baxterai.com)
 # License:
 MIT License
 
-# Requirements:
+# Installation:
 See ATORtf.tf
 
 # Usage:
@@ -27,6 +27,22 @@ from PIL import Image
 
 opencvVersion = 3	#or 4
 
+storeRFFiltersValuesAsFractions = True	#store RFFilters values as fractions (multipliers) rather than colours (additive)
+
+rgbMaxValue = 255.0
+rgbNumChannels = 3
+
+
+class RFresolutionProperties():
+	def __init__(self, resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFFiltersAndImageSegments):
+		self.resolutionIndex = resolutionIndex
+		self.resolutionIndexFirst = resolutionIndexFirst
+		self.numberOfResolutions = numberOfResolutions
+		self.imageSizeBase = imageSizeBase
+		
+		self.debugVerbose = debugVerbose
+		self.debugSaveRFFiltersAndImageSegments = debugSaveRFFiltersAndImageSegments
+	
 
 def modifyTuple(t, index, value):
 	lst = list(t)
@@ -122,18 +138,18 @@ def calculateRelativePosition2D(angle, hyp):
 	relativePosition2D = (math.sin(theta)*hyp, math.cos(theta)*hyp)
 	return relativePosition2D
 
-def getImageDimensionsR(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase):
+def getImageDimensionsR(resolutionProperties):
 
 	#for ATORtf_detectEllipses:
-	resolutionIndexReverse = numberOfResolutions-resolutionIndex+resolutionIndexFirst	#CHECKTHIS
+	resolutionIndexReverse = resolutionProperties.numberOfResolutions-resolutionProperties.resolutionIndex+resolutionProperties.resolutionIndexFirst	#CHECKTHIS
 	resolutionFactor = 2**resolutionIndexReverse
 	
 	#for ATORtf:
-	resolutionFactorReverse = 2**(resolutionIndex+1-resolutionIndexFirst)	#CHECKTHIS
+	resolutionFactorReverse = 2**(resolutionProperties.resolutionIndex+1-resolutionProperties.resolutionIndexFirst)	#CHECKTHIS
 	resolutionFactorInverse = 1.0/(resolutionFactor)
 	#print("resolutionIndex = ", resolutionIndex, ", resolutionFactor = ", resolutionFactor)
 
-	imageSize = (int(imageSizeBase[0]*resolutionFactorInverse), int(imageSizeBase[1]*resolutionFactorInverse))
+	imageSize = (int(resolutionProperties.imageSizeBase[0]*resolutionFactorInverse), int(resolutionProperties.imageSizeBase[1]*resolutionFactorInverse))
 	
 	return resolutionFactor, resolutionFactorReverse, imageSize
 

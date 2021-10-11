@@ -7,11 +7,8 @@ Richard Bruce Baxter - Copyright (c) 2021 Baxter AI (baxterai.com)
 # License:
 MIT License
 
-# Requirements:
-opencv-python>=4.5.3.56
-Pillow>=8.0.1
-click>=7.1.2
-numpy>=1.19.2
+# Installation:
+See ATORtf.tf
 
 # Usage:
 python ATORtf_detectEllipses.py images/leaf1.png
@@ -147,7 +144,7 @@ def detectEllipsesTrialResize(inputimagefilename):
 										axesLength = (axesLength1, axesLength2)
 										colour = (colour1, colour2, colour3)
 										
-										ellipseProperties = ATORtf_ellipseProperties.EllipseProperties(resolutionIndex, resolutionFactor, imageSize, centerCoordinates, axesLength, angle, colour)
+										ellipseProperties = ATORtf_ellipseProperties.EllipsePropertiesClass(centerCoordinates, axesLength, angle, colour)
 										inputImageRmod, ellipseFitError = ATORtf_ellipseProperties.testEllipseApproximation(inputImageR, ellipseProperties)
 	
 										ellipsePropertiesOrderedDict[ellipseFitError] = ellipseProperties
@@ -159,7 +156,7 @@ def detectEllipsesTrialResize(inputimagefilename):
 		ellipsePropertiesOptimumNormalisedR = []
 		for ellipseFitError, ellipseProperties in ellipsePropertiesOrderedDict.items():
 			
-			ellipsePropertiesNormalised = ATORtf_ellipseProperties.normaliseEllipseProperties(ellipseProperties)
+			ellipsePropertiesNormalised = ATORtf_ellipseProperties.normaliseGlobalEllipseProperties(ellipseProperties, resolutionFactor)
 			
 			ellipseOverlapsesWithPreviousOptimumEllipse = False
 			for ellipseProperties2 in ellipsePropertiesOptimumNormalisedR:
