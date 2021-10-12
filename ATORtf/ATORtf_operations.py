@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """ATORtf_operations.py
 
 # Author:
@@ -27,21 +26,21 @@ from PIL import Image
 
 opencvVersion = 3	#or 4
 
-storeRFFiltersValuesAsFractions = True	#store RFFilters values as fractions (multipliers) rather than colours (additive)
+storeRFfiltersValuesAsFractions = True	#store RFfilters values as fractions (multipliers) rather than colours (additive)
 
 rgbMaxValue = 255.0
 rgbNumChannels = 3
 
 
 class RFresolutionProperties():
-	def __init__(self, resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFFiltersAndImageSegments):
+	def __init__(self, resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFfiltersAndImageSegments):
 		self.resolutionIndex = resolutionIndex
 		self.resolutionIndexFirst = resolutionIndexFirst
 		self.numberOfResolutions = numberOfResolutions
 		self.imageSizeBase = imageSizeBase
 		
 		self.debugVerbose = debugVerbose
-		self.debugSaveRFFiltersAndImageSegments = debugSaveRFFiltersAndImageSegments
+		self.debugSaveRFfiltersAndImageSegments = debugSaveRFfiltersAndImageSegments
 	
 
 def modifyTuple(t, index, value):
@@ -125,7 +124,7 @@ def calculateDistanceNP(point1, point2):
 	return distance
 
 def calculateRelativePosition3D(angle, axisLength):
-	print("error calculateRelativePosition3D: RFPropertiesParent.numberOfDimensions == 3 not yet coded")
+	print("error calculateRelativePosition3D: RFpropertiesParent.numberOfDimensions == 3 not yet coded")
 	quit()
 	
 def calculateRelativePosition2D(angle, hyp):
@@ -157,4 +156,11 @@ def isTensorEmpty(tensor):
 	#https://github.com/tensorflow/tensorflow/issues/38976 : https://stackoverflow.com/questions/50529309/how-to-check-if-a-tensor-is-empty-in-tensorflow
 	is_empty = tf.equal(tf.size(tensor), 0)
 	return is_empty
-				
+			
+def calculateRelativePositionGivenAngleAndLength(angle, length):
+	theta = convertDegreesToRadians(angle)
+	x = math.cos(theta)
+	y = math.sin(theta)
+	#point = [x, y]	#floats unsupported by opencv ellipse draw
+	point = [int(x), int(y)]
+	return point

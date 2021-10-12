@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """ATORtf_detectEllipses.py
 
 # Author:

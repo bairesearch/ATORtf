@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-"""ATORtf_RFFilter.py
+"""ATORtf_RFfilter.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2021 Baxter AI (baxterai.com)
@@ -23,15 +22,15 @@ import tensorflow_addons as tfa
 import numpy as np
 import copy
 
-import ATORtf_RFProperties
+import ATORtf_RFproperties
 import ATORtf_RFellipse
 import ATORtf_RFtri
 import ATORtf_operations
 
 minimumFilterRequirement = 1.5	#CHECKTHIS: calibrate	#matched values fraction	#theoretical value: 0.95
 	
-#if(debugSaveRFFiltersAndImageSegments):
-RFFilterImageTransformFillValue = 0.0
+#if(debugSaveRFfiltersAndImageSegments):
+RFfilterImageTransformFillValue = 0.0
 
 
 def calculateFilterApplicationResultThreshold(filterApplicationResult, minimumFilterRequirement, filterSize, isColourFilter, numberOfDimensions, RFtype):
@@ -40,8 +39,8 @@ def calculateFilterApplicationResultThreshold(filterApplicationResult, minimumFi
 	
 	#if(isColourFilter):
 	#	minimumFilterRequirementLocal = minimumFilterRequirementLocal*ATORtf_operations.rgbNumChannels*ATORtf_operations.rgbNumChannels	#CHECKTHIS	#not required as assume filter colours will be normalised to the maximum value of a single rgb channel? 
-	if(not ATORtf_operations.storeRFFiltersValuesAsFractions):
-		minimumFilterRequirementLocal = minimumFilterRequirementLocal*(ATORtf_operations.rgbMaxValue*ATORtf_operations.rgbMaxValue)	#rgbMaxValue of both imageSegment and RFFilter 		
+	if(not ATORtf_operations.storeRFfiltersValuesAsFractions):
+		minimumFilterRequirementLocal = minimumFilterRequirementLocal*(ATORtf_operations.rgbMaxValue*ATORtf_operations.rgbMaxValue)	#rgbMaxValue of both imageSegment and RFfilter 		
 
 	print("minimumFilterRequirementLocal = ", minimumFilterRequirementLocal)
 	print("tf.math.reduce_max(filterApplicationResult) = ", tf.math.reduce_max(filterApplicationResult))
@@ -50,43 +49,42 @@ def calculateFilterApplicationResultThreshold(filterApplicationResult, minimumFi
 	return filterApplicationResultThreshold
 
 def calculateFilterPixels(filterSize, numberOfDimensions, RFtype):
-	if(RFtype == ATORtf_RFProperties.RFtypeEllipse):
+	if(RFtype == ATORtf_RFproperties.RFtypeEllipse):
 		return ATORtf_RFellipse.calculateFilterPixels(filterSize, numberOfDimensions)
-	elif(RFtype == ATORtf_RFProperties.RFtypeTri):
-		print("calculateFilterPixels error: RFtype == ATORtf_RFProperties.RFtypeTri not yet coded")	#count number of pixels on for each point
+	elif(RFtype == ATORtf_RFproperties.RFtypeTri):
 		return ATORtf_RFtri.calculateFilterPixels(filterSize, numberOfDimensions)
 
-def normaliseRFFilter(RFFilter, RFProperties):
+def normaliseRFfilter(RFfilter, RFproperties):
 	#normalise ellipse respect to major/minor ellipticity axis orientation (WRT self)
-	RFFilterNormalised = transformRFFilterTF(RFFilter, RFProperties) 
-	#RFFilterNormalised = RFFilter
-	return RFFilterNormalised
+	RFfilterNormalised = transformRFfilterTF(RFfilter, RFproperties) 
+	#RFfilterNormalised = RFfilter
+	return RFfilterNormalised
 	
-def transformRFFilterTF(RFFilter, RFPropertiesParent):
-	if(RFPropertiesParent.numberOfDimensions == 2):
-		centerCoordinates = [-RFPropertiesParent.centerCoordinates[0], -RFPropertiesParent.centerCoordinates[1]]
-		axesLength = 1.0/RFPropertiesParent.axesLength[0]	#[1.0/RFPropertiesParent.axesLength[0], 1.0/RFPropertiesParent.axesLength[1]]
-		angle = -RFPropertiesParent.angle
-		RFFilterTransformed = transformRFFilterTF2D(RFFilter, centerCoordinates, axesLength, angle)
-	elif(RFPropertiesParent.numberOfDimensions == 3):
-		print("error transformRFFilterWRTparentTF: RFPropertiesParent.numberOfDimensions == 3 not yet coded")
+def transformRFfilterTF(RFfilter, RFpropertiesParent):
+	if(RFpropertiesParent.numberOfDimensions == 2):
+		centerCoordinates = [-RFpropertiesParent.centerCoordinates[0], -RFpropertiesParent.centerCoordinates[1]]
+		axesLength = 1.0/RFpropertiesParent.axesLength[0]	#[1.0/RFpropertiesParent.axesLength[0], 1.0/RFpropertiesParent.axesLength[1]]
+		angle = -RFpropertiesParent.angle
+		RFfilterTransformed = transformRFfilterTF2D(RFfilter, centerCoordinates, axesLength, angle)
+	elif(RFpropertiesParent.numberOfDimensions == 3):
+		print("error transformRFfilterWRTparentTF: RFpropertiesParent.numberOfDimensions == 3 not yet coded")
 		quit()
-	return RFFilterTransformed
+	return RFfilterTransformed
 	
-def transformRFFilterTF2D(RFFilter, centerCoordinates, axesLength, angle):
+def transformRFfilterTF2D(RFfilter, centerCoordinates, axesLength, angle):
 	#CHECKTHIS: 2D code only;
-	#RFFilterTransformed = tf.expand_dims(RFFilterTransformed, 0)	#add extra dimension for num_images
-	RFFilterTransformed = RFFilter
+	#RFfilterTransformed = tf.expand_dims(RFfilterTransformed, 0)	#add extra dimension for num_images
+	RFfilterTransformed = RFfilter
 	angleRadians =  ATORtf_operations.convertDegreesToRadians(angle)
-	RFFilterTransformed = tfa.image.rotate(RFFilterTransformed, angleRadians, fill_value=RFFilterImageTransformFillValue)		#https://www.tensorflow.org/addons/api_docs/python/tfa/image/rotate
+	RFfilterTransformed = tfa.image.rotate(RFfilterTransformed, angleRadians, fill_value=RFfilterImageTransformFillValue)		#https://www.tensorflow.org/addons/api_docs/python/tfa/image/rotate
 	centerCoordinatesList = [float(x) for x in list(centerCoordinates)]
-	RFFilterTransformed = tfa.image.translate(RFFilterTransformed, centerCoordinatesList, fill_value=RFFilterImageTransformFillValue)		#fill_value=RFFilterImageTransformFillValue	#https://www.tensorflow.org/addons/api_docs/python/tfa/image/translate
+	RFfilterTransformed = tfa.image.translate(RFfilterTransformed, centerCoordinatesList, fill_value=RFfilterImageTransformFillValue)		#fill_value=RFfilterImageTransformFillValue	#https://www.tensorflow.org/addons/api_docs/python/tfa/image/translate
 	#print("axesLength = ", axesLength)	
-	#print("RFFilterTransformed.shape = ", RFFilterTransformed.shape)	
-	RFFilterTransformed = imageScale(RFFilterTransformed, axesLength)	#https://www.tensorflow.org/api_docs/python/tf/image/resize
-	#print("RFFilterTransformed.shape = ", RFFilterTransformed.shape)	
-	RFFilterTransformed = tf.squeeze(RFFilterTransformed)
-	return RFFilterTransformed
+	#print("RFfilterTransformed.shape = ", RFfilterTransformed.shape)	
+	RFfilterTransformed = imageScale(RFfilterTransformed, axesLength)	#https://www.tensorflow.org/api_docs/python/tf/image/resize
+	#print("RFfilterTransformed.shape = ", RFfilterTransformed.shape)	
+	RFfilterTransformed = tf.squeeze(RFfilterTransformed)
+	return RFfilterTransformed
 
 def imageScale(img, scaleFactor):
 	a0 = scaleFactor
@@ -96,11 +94,11 @@ def imageScale(img, scaleFactor):
 	return transformedImage
 
 		
-def rotateRFFilterTF(RFFilter, RFProperties):
-	return rotateRFFilterTF(-RFProperties.angle)
-def rotateRFFilterTF(RFFilter, angle):
-	RFFilter = tf.expand_dims(RFFilter, 0)	#add extra dimension for num_images
-	return RFFilterNormalised
+def rotateRFfilterTF(RFfilter, RFproperties):
+	return rotateRFfilterTF(-RFproperties.angle)
+def rotateRFfilterTF(RFfilter, angle):
+	RFfilter = tf.expand_dims(RFfilter, 0)	#add extra dimension for num_images
+	return RFfilterNormalised
 		
 
 #CHECKTHIS: upgrade code to support ATORtf_RFtri

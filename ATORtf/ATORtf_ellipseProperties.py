@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """ATORtf_ellipseProperties.py
 
 # Author:
@@ -18,9 +17,12 @@ ATORtf Ellipse (or Ellipsoid) Properties
 
 """
 
+import tensorflow as tf
+import numpy as np
 import cv2
 import copy
-import numpy as np
+
+import ATORtf_operations
 
 ellipseAngleResolution = 10	#degrees
 minimumEllipseFitErrorRequirement = 1500.0	#calibrate
@@ -33,10 +35,25 @@ class EllipsePropertiesClass():	#or EllipsoidProperties
 		self.axesLength = axesLength
 		self.angle = angle
 		self.colour = colour	#only used by ATORtf_detectEllipses
-
+	
 def drawEllipse(outputImage, ellipseProperties):
 	#https://docs.opencv.org/4.5.3/d6/d6e/group__imgproc__draw.html#ga28b2267d35786f5f890ca167236cbc69
+	#print("ellipseProperties.centerCoordinates = ", ellipseProperties.centerCoordinates)
+	#print("ellipseProperties.axesLength = ", ellipseProperties.axesLength)
+	#print("ellipseProperties.angle = ", ellipseProperties.angle)
+	#print("ellipseProperties.colour = ", ellipseProperties.colour)
+	
 	outputImageMod = cv2.ellipse(outputImage, ellipseProperties.centerCoordinates, ellipseProperties.axesLength, ellipseProperties.angle, 0, 360, ellipseProperties.colour, -1)
+	
+	#print("outputImageMod = ", outputImageMod)
+	
+	return outputImageMod
+	
+def drawCircle(outputImage, ellipseProperties):	
+	outputImageMod = cv2.circle(outputImage, ellipseProperties.centerCoordinates, ellipseProperties.axesLength[0], ellipseProperties.colour, -1)
+	
+	#print("outputImageMod = ", outputImageMod)
+	
 	return outputImageMod
 
 def normaliseGlobalEllipseProperties(ellipseProperties, resolutionFactor):
@@ -75,4 +92,4 @@ def centroidOverlapsEllipse(ellipseProperties, ellipsePropertiesOptimumLast):
 	return result		
 	
 def printEllipseProperties(ellipseProperties):
-	print("centerCoordinates = ", ellipseProperties.centerCoordinates, ", axesLength = ", ellipseProperties.axesLength, ", angle = ", ellipseProperties.angle, ", colour = ", ellipseProperties.colour)	
+	print("printEllipseProperties: centerCoordinates = ", ellipseProperties.centerCoordinates, ", axesLength = ", ellipseProperties.axesLength, ", angle = ", ellipseProperties.angle, ", colour = ", ellipseProperties.colour)	
