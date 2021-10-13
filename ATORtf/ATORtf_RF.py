@@ -28,14 +28,22 @@ import ATORtf_RFfilter
 import ATORtf_RFproperties
 import ATORtf_operations
 
-
+class RFneuronClass():
+	def __init__(self, resolutionProperties, RFproperties, RFfilter, RFImage):
+		self.resolutionIndex = resolutionProperties.resolutionIndex
+		self.RFproperties = RFproperties
+		#if(debugSaveRFfiltersAndImageSegments):
+		self.RFfilter = RFfilter
+		self.RFneuronParents = []
+		self.RFneuronComponents = []
+		
 def normaliseRFComponentWRTparent(resolutionProperties, neuronComponent, RFpropertiesParent):
 	neuronComponent.RFpropertiesNormalisedWRTparent = ATORtf_RFproperties.generateRFtransformedProperties(neuronComponent, RFpropertiesParent)
 	if(resolutionProperties.debugSaveRFfiltersAndImageSegments):
 		neuronComponent.RFfilterNormalisedWRTparent = ATORtf_RFfilter.transformRFfilterTF(neuronComponent.RFfilter, RFpropertiesParent)
 		neuronComponent.RFImageNormalisedWRTparent = ATORtf_RFfilter.transformRFfilterTF(neuronComponent.RFImage, RFpropertiesParent)
 		
-#TODO: this needs to be upgraded with a robust method (preferably via RF neural net that contains associations between RFs at different resolutions)
+#TODO: this needs to be upgraded with a robust method
 def childRFoverlapsParentRF(neuronRFpropertiesNormalisedGlobal, lowerNeuronRFpropertiesNormalisedGlobal):
 	if(neuronRFpropertiesNormalisedGlobal.RFtype == ATORtf_RFproperties.RFtypeEllipse):
 		return ATORtf_ellipseProperties.centroidOverlapsEllipse(neuronRFpropertiesNormalisedGlobal, lowerNeuronRFpropertiesNormalisedGlobal)
@@ -70,11 +78,11 @@ def generateRFfilters(resolutionProperties, generateRFfiltersEllipse, generateRF
 		ATORtf_RFtri.generateRFfiltersTri(resolutionProperties, RFfiltersList, RFfiltersPropertiesList)
 	
 	return RFfiltersList, RFfiltersPropertiesList
-
+	
 def applyRFfilters(resolutionProperties, inputImageSegments, RFfiltersTensor, numberOfDimensions, RFfiltersPropertiesList2):
 	
 	#perform convolution for each filter size;
-	resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize = ATORtf_RFfilter.getFilterDimensions(resolutionProperties)
+	axesLengthMax, filterRadius, filterSize = ATORtf_RFfilter.getFilterDimensions(resolutionProperties)
 		
 	#filterApplicationResultList = []
 	RFpropertiesList = []
@@ -123,7 +131,7 @@ def applyRFfilters(resolutionProperties, inputImageSegments, RFfiltersTensor, nu
 			#RFlistIndex = imageSegmentIndex*len(RFfiltersPropertiesList2) +  RFfiltersPropertiesList2Index
 
 			imageSegmentIndex, RFfilterIndex = divmod(RFlistIndex, len(RFfiltersTensor))
-			centerCoordinates1, centerCoordinates2 = divmod(imageSegmentIndex, imageSize[1])
+			centerCoordinates1, centerCoordinates2 = divmod(imageSegmentIndex, resolutionProperties.imageSize[1])
 			centerCoordinates = (centerCoordinates1, centerCoordinates2)
 
 			#print("adding RFproperties")
@@ -137,10 +145,10 @@ def applyRFfilters(resolutionProperties, inputImageSegments, RFfiltersTensor, nu
 
 		#inefficient:
 		#imageSegmentIndex = 0
-		#for centerCoordinates1 in range(0, imageSize[0], ellipseCenterCoordinatesResolution):
-		#	for centerCoordinates2 in range(0, imageSize[1], ellipseCenterCoordinatesResolution):
+		#for centerCoordinates1 in range(0, resolutionProperties.imageSize[0], ellipseCenterCoordinatesResolution):
+		#	for centerCoordinates2 in range(0, resolutionProperties.imageSize[1], ellipseCenterCoordinatesResolution):
 		#		centerCoordinates = (centerCoordinates1, centerCoordinates2)
-		#		allFilterCoordinatesWithinImageResult, imageSegmentStart, imageSegmentEnd = ATORtf_RFfilter.allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, imageSize)
+		#		allFilterCoordinatesWithinImageResult, imageSegmentStart, imageSegmentEnd = ATORtf_RFfilter.allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, resolutionProperties.imageSize)
 		#		if(allFilterCoordinatesWithinImageResult):
 		#			for RFfilterIndex, RFfiltersProperties in enumerate(RFfiltersPropertiesList2):
 		#				RFproperties = copy.deepcopy(RFfiltersProperties)

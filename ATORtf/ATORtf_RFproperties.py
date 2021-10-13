@@ -30,6 +30,9 @@ RFtypeEllipse = 1
 RFtypeTri = 2
 
 
+#supportFractionalRFdrawSize = False	#floats unsupported by opencv ellipse draw - requires large draw, then resize down (interpolation)
+
+
 class RFpropertiesClass(ATORtf_ellipseProperties.EllipsePropertiesClass):
 	def __init__(self, resolutionIndex, resolutionFactor, imageSize, RFtype, centerCoordinates, axesLength, angle, colour):
 		

@@ -39,6 +39,8 @@ class RFresolutionProperties():
 		self.numberOfResolutions = numberOfResolutions
 		self.imageSizeBase = imageSizeBase
 		
+		self.resolutionFactor, self.resolutionFactorReverse, self.imageSize = getImageDimensionsR(self)
+		
 		self.debugVerbose = debugVerbose
 		self.debugSaveRFfiltersAndImageSegments = debugSaveRFfiltersAndImageSegments
 	
@@ -164,3 +166,29 @@ def calculateRelativePositionGivenAngleAndLength(angle, length):
 	#point = [x, y]	#floats unsupported by opencv ellipse draw
 	point = [int(x), int(y)]
 	return point
+
+def getEquilateralTriangleAxesLength(opp):
+	#create equilateral triangle
+	#tan(60) = opp/adj
+	#adj = tan(60)/opp
+	angle = 60
+	theta = convertDegreesToRadians(angle)
+	adj = math.tan(theta)/opp
+	return (opp, adj)
+		
+
+def initialiseEmptyList(size):
+	return initialiseList(size, None)
+	
+def initialiseEmpty2dimensionalList(sizes):
+	return initialise2dimensionalList(sizes, None)
+
+def initialiseList(size, value):
+	list = [value]*size
+	return list
+	
+def initialise2dimensionalList(sizes, value):
+	list = [ [value]*sizes[0] for i in range(sizes[1])]
+	return list
+
+	

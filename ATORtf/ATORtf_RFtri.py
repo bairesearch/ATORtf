@@ -27,7 +27,6 @@ import ATORtf_operations
 
 #RF Tri can be applied to luminosity or contrast maps
 
-
 pointFeatureRFinsideRadius = 1 	#floats unsupported by opencv ellipse draw: 0.5	#CHECKTHIS - requires calibration
 pointFeatureRFopponencyArea = 2	#floats unsupported by opencv ellipse draw: 0.5	#CHECKTHIS - requires calibration
 
@@ -44,6 +43,9 @@ else:
 
 #match ATORtf_RFellipse algorithm;
 matchRFellipseAlgorithm = True	#else create equilateral triangle snapshot
+
+#match ATORtf_RFellipse algorithm;
+RFnormaliseLocalEquilateralTriangle = True
 
 #match ATORtf_RFellipse algorithm;
 ellipseNormalisedAngle = 0.0
@@ -79,16 +81,11 @@ def normaliseLocalTriProperties(RFproperties):
 	RFpropertiesNormalised = copy.deepcopy(RFproperties)
 	RFpropertiesNormalised.angle = ellipseNormalisedAngle	#CHECKTHIS
 	RFpropertiesNormalised.centerCoordinates = (ellipseNormalisedCentreCoordinates, ellipseNormalisedCentreCoordinates, ellipseNormalisedCentreCoordinates)
-	if(matchRFellipseAlgorithm):
-		RFpropertiesNormalised.axesLength = (ellipseNormalisedAxesLength, ellipseNormalisedAxesLength)
+	if(RFnormaliseLocalEquilateralTriangle):
+		RFpropertiesNormalised.axesLength = ATORtf_operations.getEquilateralTriangleAxesLength(ellipseNormalisedAxesLength)
 	else:
-		#create equilateral triangle
-		#tan(60) = opp/adj
-		#adj = tan(60)/opp
-		theta = ATORtf_operations.convertDegreesToRadians(angle)
-		opp = ellipseNormalisedAxesLength
-		adj = math.tan(theta)/opp
-		RFpropertiesNormalised.axesLength = (opp, adj)
+		RFpropertiesNormalised.axesLength = (ellipseNormalisedAxesLength, ellipseNormalisedAxesLength)
+		
 	return RFpropertiesNormalised
 
 #match ATORtf_RFellipse algorithm;	
@@ -113,7 +110,8 @@ def getInternalFilterSize(filterSize, numberOfDimensions):
 	
 		
 def generateRFfiltersTri(resolutionProperties, RFfiltersList, RFfiltersPropertiesList):
-
+	#generate filter types
+	
 	#2D code;
 	
 	#filters are generated based on human magnocellular/parvocellular/koniocellular wavelength discrimination in LGN and VX (double/opponent receptive fields)
@@ -135,7 +133,7 @@ def generateRotationalInvariantRFfilters(resolutionProperties, isColourFilter, f
 	#FUTURE: consider storing filters in n dimensional array and finding local minima of filter matches across all dimensions
 
 	#reduce max size of ellipse at each res
-	resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize = getFilterDimensions(resolutionProperties)
+	axesLengthMax, filterRadius, filterSize = getFilterDimensions(resolutionProperties)
 	
 	#print("axesLengthMax = ", axesLengthMax)
 	
@@ -157,8 +155,8 @@ def generateRotationalInvariantRFfilters(resolutionProperties, isColourFilter, f
 										angleOutside = 0.0	#circular
 										filterCenterCoordinates = (0, 0)
 
-										RFpropertiesInside = ATORtf_RFproperties.RFpropertiesClass(resolutionProperties.resolutionIndex, resolutionFactor, filterSize, ATORtf_RFproperties.RFtypeEllipse, filterCenterCoordinates, axesLengthInside, angleInside, filterInsideColour)
-										RFpropertiesOutside = ATORtf_RFproperties.RFpropertiesClass(resolutionProperties.resolutionIndex, resolutionFactor, filterSize, ATORtf_RFproperties.RFtypeEllipse, filterCenterCoordinates, axesLengthOutside, angleOutside, filterOutsideColour)
+										RFpropertiesInside = ATORtf_RFproperties.RFpropertiesClass(resolutionProperties.resolutionIndex, resolutionProperties.resolutionFactor, filterSize, ATORtf_RFproperties.RFtypeEllipse, filterCenterCoordinates, axesLengthInside, angleInside, filterInsideColour)
+										RFpropertiesOutside = ATORtf_RFproperties.RFpropertiesClass(resolutionProperties.resolutionIndex, resolutionProperties.resolutionFactor, filterSize, ATORtf_RFproperties.RFtypeEllipse, filterCenterCoordinates, axesLengthOutside, angleOutside, filterOutsideColour)
 										RFpropertiesInside.isColourFilter = isColourFilter
 										RFpropertiesOutside.isColourFilter = isColourFilter
 
@@ -219,7 +217,6 @@ def generateRFfilter(resolutionProperties, isColourFilter, RFpropertiesInside, R
 	# where "-" = -RFcolourOutside [R G B], "+" = +RFcolourInside [R G B], and "0" = [0, 0, 0]
 	
 	#generate ellipse on blank canvas
-	#resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionProperties)
 	blankArray = np.full((RFpropertiesInside.imageSize[1], RFpropertiesInside.imageSize[0], ATORtf_operations.rgbNumChannels), 0, np.uint8)	#rgb
 	RFfilterTF = tf.convert_to_tensor(blankArray, dtype=tf.float32)
 	
@@ -259,16 +256,15 @@ def generateRFfilter(resolutionProperties, isColourFilter, RFpropertiesInside, R
 	
 
 def getFilterDimensions(resolutionProperties):
-	resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionProperties)
 	#reduce max size of ellipse at each res
-	axesLengthMax1 = int(imageSize[0]//resolutionFactorReverse * 1 / 2)	#CHECKTHIS
-	axesLengthMax2 = int(imageSize[1]//resolutionFactorReverse * 1 / 2)	#CHECKTHIS
+	axesLengthMax1 = int(resolutionProperties.imageSize[0]//resolutionProperties.resolutionFactorReverse * 1 / 2)	#CHECKTHIS
+	axesLengthMax2 = int(resolutionProperties.imageSize[1]//resolutionProperties.resolutionFactorReverse * 1 / 2)	#CHECKTHIS
 	filterRadius = int(max(axesLengthMax1*filterSnapshotArea, axesLengthMax2*filterSnapshotArea)/2)	
 	filterSize = (int(filterRadius*2), int(filterRadius*2))	#x/y dimensions are identical
 	axesLengthMax = (axesLengthMax1, axesLengthMax2)
 	
-	#print("resolutionFactorReverse = ", resolutionFactorReverse)
-	#print("resolutionFactor = ", imageSize)
+	#print("resolutionFactorReverse = ", resolutionProperties.resolutionFactorReverse)
+	#print("resolutionFactor = ", resolutionProperties.imageSize)
 	#print("axesLengthMax = ", axesLengthMax)
 	
 	return resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize	

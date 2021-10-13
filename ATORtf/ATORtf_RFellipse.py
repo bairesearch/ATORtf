@@ -30,11 +30,21 @@ import ATORtf_operations
 ellipseAngleResolution = 10	#degrees
 minimumEllipseFitErrorRequirement = 1500.0	#calibrate
 
+#match ATORtf_RFellipse algorithm;
+RFnormaliseLocalEquilateralTriangle = True
+
 ellipseNormalisedAngle = 0.0
 ellipseNormalisedCentreCoordinates = 0.0 
 ellipseNormalisedAxesLength = 1.0
 
-minimumEllipseLength = 2
+# ellipse axesLength definition (based on https://docs.opencv.org/4.5.3/d6/d6e/group__imgproc__draw.html#ga28b2267d35786f5f890ca167236cbc69)
+#  ___
+# / | \ minimumEllipseLength1 | (axis1: axes width)
+# | --| minimumEllipseLength2 - (axis2: axis height)
+# \___/
+#
+minimumEllipseLength1 = 2	#minimum elongation is required
+minimumEllipseLength2 = 1
 ellipseAxesLengthResolution = 1	#pixels (at resolution r)
 ellipseAngleResolution = 30	#degrees
 ellipseColourResolution = 64	#bits
@@ -49,7 +59,10 @@ def normaliseLocalEllipseProperties(RFproperties):
 	RFpropertiesNormalised = copy.deepcopy(RFproperties)
 	RFpropertiesNormalised.angle = ellipseNormalisedAngle	#CHECKTHIS
 	RFpropertiesNormalised.centerCoordinates = (ellipseNormalisedCentreCoordinates, ellipseNormalisedCentreCoordinates, ellipseNormalisedCentreCoordinates)
-	RFpropertiesNormalised.axesLength = (ellipseNormalisedAxesLength, ellipseNormalisedAxesLength)
+	if(RFnormaliseLocalEquilateralTriangle):
+		RFpropertiesNormalised.axesLength = ATORtf_operations.getEquilateralTriangleAxesLength(ellipseNormalisedAxesLength)
+	else:
+		RFpropertiesNormalised.axesLength = (ellipseNormalisedAxesLength, ellipseNormalisedAxesLength)
 	return RFpropertiesNormalised
 
 def calculateFilterPixels(filterSize, numberOfDimensions):
@@ -72,7 +85,8 @@ def getInternalFilterSize(filterSize, numberOfDimensions):
 	
 
 def generateRFfiltersEllipse(resolutionProperties, RFfiltersList, RFfiltersPropertiesList):
-
+	#generate filter types
+	
 	#2D code;
 	
 	#filters are generated based on human magnocellular/parvocellular/koniocellular wavelength discrimination in LGN and VX (double/opponent receptive fields)
@@ -115,37 +129,38 @@ def generateRotationalInvariantRFfilters(resolutionProperties, isColourFilter, f
 	#FUTURE: consider storing filters in n dimensional array and finding local minima of filter matches across all dimensions
 
 	#reduce max size of ellipse at each res
-	resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize = getFilterDimensions(resolutionProperties)
+	axesLengthMax, filterRadius, filterSize = getFilterDimensions(resolutionProperties)
 	
 	#print("axesLengthMax = ", axesLengthMax)
 	
-	for axesLength1 in range(minimumEllipseLength, axesLengthMax[0]+1, ellipseAxesLengthResolution):
-		for axesLength2 in range(minimumEllipseLength, axesLengthMax[1]+1, ellipseAxesLengthResolution):
-			for angle in range(0, 360, ellipseAngleResolution):	#degrees
-				
-				axesLengthInside = (axesLength1, axesLength2)
-				axesLengthOutside = (int(axesLength1*receptiveFieldOpponencyArea), int(axesLength2*receptiveFieldOpponencyArea))
-				filterCenterCoordinates = (0, 0)
-				
-				RFpropertiesInside = ATORtf_RFproperties.RFpropertiesClass(resolutionProperties.resolutionIndex, resolutionFactor, filterSize, ATORtf_RFproperties.RFtypeEllipse, filterCenterCoordinates, axesLengthInside, angle, filterInsideColour)
-				RFpropertiesOutside = ATORtf_RFproperties.RFpropertiesClass(resolutionProperties.resolutionIndex, resolutionFactor, filterSize, ATORtf_RFproperties.RFtypeEllipse, filterCenterCoordinates, axesLengthOutside, angle, filterOutsideColour)
-				RFpropertiesInside.isColourFilter = isColourFilter
-				RFpropertiesOutside.isColourFilter = isColourFilter
+	for axesLength1 in range(minimumEllipseLength1, axesLengthMax[0]+1, ellipseAxesLengthResolution):
+		for axesLength2 in range(minimumEllipseLength2, axesLengthMax[1]+1, ellipseAxesLengthResolution):
+			if(axesLength1 > axesLength2):	#ensure that ellipse is always alongated towards axis1 (required for consistent normalisation)
+				for angle in range(0, 360, ellipseAngleResolution):	#degrees
 
-				RFfilter = generateRFfilter(resolutionProperties.resolutionIndex, isColourFilter, RFpropertiesInside, RFpropertiesOutside)
-				RFfiltersList2.append(RFfilter)
-				
-				RFproperties = copy.deepcopy(RFpropertiesInside)
-				#RFproperties.centerCoordinates = centerCoordinates 	#centerCoordinates are set after filter is applied to imageSegment
-				RFfiltersPropertiesList2.append(RFproperties)	#CHECKTHIS: use RFpropertiesInside not RFpropertiesOutside
+					axesLengthInside = (axesLength1, axesLength2)
+					axesLengthOutside = (int(axesLength1*receptiveFieldOpponencyArea), int(axesLength2*receptiveFieldOpponencyArea))
+					filterCenterCoordinates = (0, 0)
 
-				#debug:
-				#print(RFfilter.shape)
-				if(resolutionProperties.debugVerbose):
-					ATORtf_RFproperties.printRFproperties(RFproperties)
-					#ATORtf_RFproperties.printRFproperties(RFpropertiesInside)
-					#ATORtf_RFproperties.printRFproperties(RFpropertiesOutside)				
-				#print("RFfilter = ", RFfilter)
+					RFpropertiesInside = ATORtf_RFproperties.RFpropertiesClass(resolutionProperties.resolutionIndex, resolutionProperties.resolutionFactor, filterSize, ATORtf_RFproperties.RFtypeEllipse, filterCenterCoordinates, axesLengthInside, angle, filterInsideColour)
+					RFpropertiesOutside = ATORtf_RFproperties.RFpropertiesClass(resolutionProperties.resolutionIndex, resolutionProperties.resolutionFactor, filterSize, ATORtf_RFproperties.RFtypeEllipse, filterCenterCoordinates, axesLengthOutside, angle, filterOutsideColour)
+					RFpropertiesInside.isColourFilter = isColourFilter
+					RFpropertiesOutside.isColourFilter = isColourFilter
+
+					RFfilter = generateRFfilter(resolutionProperties.resolutionIndex, isColourFilter, RFpropertiesInside, RFpropertiesOutside)
+					RFfiltersList2.append(RFfilter)
+
+					RFproperties = copy.deepcopy(RFpropertiesInside)
+					#RFproperties.centerCoordinates = centerCoordinates 	#centerCoordinates are set after filter is applied to imageSegment
+					RFfiltersPropertiesList2.append(RFproperties)	#CHECKTHIS: use RFpropertiesInside not RFpropertiesOutside
+
+					#debug:
+					#print(RFfilter.shape)
+					if(resolutionProperties.debugVerbose):
+						ATORtf_RFproperties.printRFproperties(RFproperties)
+						#ATORtf_RFproperties.printRFproperties(RFpropertiesInside)
+						#ATORtf_RFproperties.printRFproperties(RFpropertiesOutside)				
+					#print("RFfilter = ", RFfilter)
 
 	#create 3D tensor (for hardware accelerated test/application of filters)
 	RFfiltersTensor = tf.stack(RFfiltersList2, axis=0)
@@ -166,7 +181,6 @@ def generateRFfilter(resolutionProperties, isColourFilter, RFpropertiesInside, R
 	# where "-" = -RFcolourOutside [R G B], "+" = +RFcolourInside [R G B], and "0" = [0, 0, 0]
 	
 	#generate ellipse on blank canvas
-	#resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionProperties)
 	blankArray = np.full((RFpropertiesInside.imageSize[1], RFpropertiesInside.imageSize[0], ATORtf_operations.rgbNumChannels), 0, np.uint8)	#rgb
 	RFfilterTF = tf.convert_to_tensor(blankArray, dtype=tf.float32)
 
@@ -187,17 +201,16 @@ def generateRFfilter(resolutionProperties, isColourFilter, RFpropertiesInside, R
 	return RFfilterTF
 		
 def getFilterDimensions(resolutionProperties):
-	resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionProperties)
 	#reduce max size of ellipse at each res
-	axesLengthMax1 = int(imageSize[0]//resolutionFactorReverse * 1 / 2)	#CHECKTHIS
-	axesLengthMax2 = int(imageSize[1]//resolutionFactorReverse * 1 / 2)	#CHECKTHIS
+	axesLengthMax1 = int(resolutionProperties.imageSize[0]//resolutionProperties.resolutionFactorReverse * 1 / 2)	#CHECKTHIS
+	axesLengthMax2 = int(resolutionProperties.imageSize[1]//resolutionProperties.resolutionFactorReverse * 1 / 2)	#CHECKTHIS
 	filterRadius = int(max(axesLengthMax1*receptiveFieldOpponencyArea, axesLengthMax2*receptiveFieldOpponencyArea)/2)	
 	filterSize = (int(filterRadius*2), int(filterRadius*2))	#x/y dimensions are identical
 	axesLengthMax = (axesLengthMax1, axesLengthMax2)
 	
-	#print("resolutionFactorReverse = ", resolutionFactorReverse)
-	#print("resolutionFactor = ", imageSize)
+	#print("resolutionFactorReverse = ", resolutionProperties.resolutionFactorReverse)
+	#print("resolutionFactor = ", resolutionProperties.imageSize)
 	#print("axesLengthMax = ", axesLengthMax)
 	
-	return resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize	
+	return axesLengthMax, filterRadius, filterSize	
 	

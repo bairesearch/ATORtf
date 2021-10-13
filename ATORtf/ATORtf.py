@@ -58,8 +58,8 @@ import ATORtf_operations
 
 np.set_printoptions(threshold=sys.maxsize)
 
-generateRFfiltersEllipse = False
-generateRFfiltersTri = True
+generateRFfiltersEllipse = True
+generateRFfiltersTri = False
 
 debugLowIterations = False
 debugVerbose = True
@@ -75,13 +75,13 @@ imageSizeBase = (256, 256)	#maximum image resolution used by ATORtf algorithm	#C
 
 
 class ATORneuronClass():
-	def __init__(self, resolutionIndex, resolutionFactor, RFproperties, RFfilter, RFImage):
-		self.resolutionIndex = resolutionIndex
+	def __init__(self, resolutionProperties, RFproperties, RFfilter, RFImage):
+		self.resolutionIndex = resolutionProperties.resolutionIndex
 		self.RFproperties = RFproperties
 		self.RFpropertiesNormalised = ATORtf_RF.normaliseLocalRFproperties(RFproperties)
 		self.RFpropertiesNormalisedWRTparent = None
 		
-		self.RFpropertiesNormalisedGlobal = ATORtf_RF.normaliseGlobalRFproperties(RFproperties, resolutionFactor)
+		self.RFpropertiesNormalisedGlobal = ATORtf_RF.normaliseGlobalRFproperties(RFproperties, resolutionProperties.resolutionFactor)
 		if(debugSaveRFfiltersAndImageSegments):
 			self.RFfilter = RFfilter
 			self.RFfilterNormalised = ATORtf_RFfilter.normaliseRFfilter(RFfilter, RFproperties)
@@ -114,7 +114,8 @@ def createRFhierarchyAccelerated(inputimagefilename):
 	print("inputImageHeight = ", inputImageHeight, "inputImageWidth = ", inputImageWidth, ", inputImageChannels = ", inputImageChannels)
 	blankArray = np.full((inputImageHeight, inputImageWidth, 3), 255, np.uint8)
 	outputImage = blankArray
-	
+
+	#RFneuralNetworkListAllRes = []	#store mapping between receptive fields at different resolutions (for fast lookup)	
 	ATORneuronListAllLayers = []
 			
 	inputImageRGBSegmentsAllRes = []	#stores subsets of input image at different resolutions, centreCoordinates, and size
@@ -128,26 +129,28 @@ def createRFhierarchyAccelerated(inputimagefilename):
 	else:
 		resolutionIndexMax = numberOfResolutions
 	
-	resolutionProperties = ATORtf_operations.RFresolutionProperties(-1, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFfiltersAndImageSegments)
-
 	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
-		resolutionProperties.resolutionIndex = resolutionIndex
-		resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionProperties)
-		inputImageRGBTF = tf.image.resize(inputImageRGBTF, imageSize)
-		inputImageGrayTF = tf.image.resize(inputImageGrayTF, imageSize)
+		resolutionProperties = ATORtf_operations.RFresolutionProperties(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFfiltersAndImageSegments)
+		inputImageRGBTF = tf.image.resize(inputImageRGBTF, resolutionProperties.imageSize)
+		inputImageGrayTF = tf.image.resize(inputImageGrayTF, resolutionProperties.imageSize)
 		inputImageRGBSegments, inputImageGraySegments = generateImageSegments(resolutionProperties, inputImageRGBTF, inputImageGrayTF)
 		inputImageRGBSegmentsAllRes.append(inputImageRGBSegments)
 		inputImageGraySegmentsAllRes.append(inputImageGraySegments)
 		
 	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
-		resolutionProperties.resolutionIndex = resolutionIndex
+		resolutionProperties = ATORtf_operations.RFresolutionProperties(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFfiltersAndImageSegments)
 		RFfiltersList, RFfiltersPropertiesList = ATORtf_RF.generateRFfilters(resolutionProperties, generateRFfiltersEllipse, generateRFfiltersTri)
 		RFfiltersListAllRes.append(RFfiltersList)
 		RFfiltersPropertiesListAllRes.append(RFfiltersPropertiesList)
 		
+	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
+		resolutionProperties = ATORtf_operations.RFresolutionProperties(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFfiltersAndImageSegments)
+		ATORneuronListArray = initialiseATORneuronListArray(resolutionProperties)
+		ATORneuronListAllLayers.append(ATORneuronListArray)
+		
 	#applyRFfilters:
 	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
-		resolutionProperties.resolutionIndex = resolutionIndex
+		resolutionProperties = ATORtf_operations.RFresolutionProperties(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFfiltersAndImageSegments)
 		print("resolutionIndex = ", resolutionIndex)
 		inputImageRGBSegments = inputImageRGBSegmentsAllRes[resolutionIndex]
 		inputImageGraySegments = inputImageGraySegmentsAllRes[resolutionIndex]
@@ -155,17 +158,23 @@ def createRFhierarchyAccelerated(inputimagefilename):
 		RFfiltersPropertiesList = RFfiltersPropertiesListAllRes[resolutionIndex]
 		applyRFfiltersList(resolutionProperties, inputImageRGBSegments, inputImageGraySegments, RFfiltersList, RFfiltersPropertiesList, ATORneuronListAllLayers)
 
+
+def initialiseATORneuronListArray(resolutionProperties):
+	size = (resolutionProperties.imageSize[0], resolutionProperties.imageSize[1])
+	ATORneuronListArray = ATORtf_operations.initialiseEmpty2dimensionalList(size)
+	return ATORneuronListArray
+		
 def generateImageSegments(resolutionProperties, inputImageRGBTF, inputImageGrayTF):
 	inputImageRGBSegmentsList = []
 	inputImageGraySegmentsList = []
 	
-	resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize = ATORtf_RFfilter.getFilterDimensions(resolutionProperties)
+	axesLengthMax, filterRadius, filterSize = ATORtf_RFfilter.getFilterDimensions(resolutionProperties)
 	
 	if(debugVerbose):
 		print("")
 		print("resolutionIndex = ", resolutionProperties.resolutionIndex)
-		print("resolutionFactor = ", resolutionFactor)
-		print("imageSize = ", imageSize)
+		print("resolutionFactor = ", resolutionProperties.resolutionFactor)
+		print("imageSize = ", resolutionProperties.imageSize)
 		print("filterRadius = ", filterRadius)
 		print("axesLengthMax = ", axesLengthMax)
 		print("filterSize = ", filterSize)
@@ -174,14 +183,14 @@ def generateImageSegments(resolutionProperties, inputImageRGBTF, inputImageGrayT
 	#print("inputImageGrayTF.shape = ", inputImageGrayTF.shape)
 	
 	imageSegmentIndex = 0		
-	for centerCoordinates1 in range(0, imageSize[0], ellipseCenterCoordinatesResolution):
-		for centerCoordinates2 in range(0, imageSize[1], ellipseCenterCoordinatesResolution):
+	for centerCoordinates1 in range(0, resolutionProperties.imageSize[0], ellipseCenterCoordinatesResolution):
+		for centerCoordinates2 in range(0, resolutionProperties.imageSize[1], ellipseCenterCoordinatesResolution):
 			centerCoordinates = (centerCoordinates1, centerCoordinates2)
-			#print("imageSize = ", imageSize)
+			#print("imageSize = ", resolutionProperties.imageSize)
 			#print("filterRadius = ", filterRadius)
 			#print("filterSize = ", filterSize)
 			#print("centerCoordinates = ", centerCoordinates)
-			allFilterCoordinatesWithinImageResult, imageSegmentStart, imageSegmentEnd = ATORtf_RFfilter.allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, imageSize)
+			allFilterCoordinatesWithinImageResult, imageSegmentStart, imageSegmentEnd = ATORtf_RFfilter.allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, resolutionProperties.imageSize)
 			#if(not allFilterCoordinatesWithinImageResult): image segments and their applied filters will be discarded, but artificial (beyond bounds) image segments are still added to inputImageSegments tensor for algorithm uniformity
 			inputImageRGBSegment = inputImageRGBTF[imageSegmentStart[0]:imageSegmentEnd[0], imageSegmentStart[1]:imageSegmentEnd[1], :]
 			inputImageGraySegment = inputImageGrayTF[imageSegmentStart[0]:imageSegmentEnd[0], imageSegmentStart[1]:imageSegmentEnd[1], :]
@@ -205,16 +214,15 @@ def applyRFfiltersList(resolutionProperties, inputImageRGBSegments, inputImageGr
 	
 	print("\tapplyRFfiltersList: resolutionIndex = ", resolutionProperties.resolutionIndex)
 	
-	ATORneuronList = []	#for resolutionIndex
+	ATORneuronListArray = ATORneuronListAllLayers[resolutionProperties.resolutionIndex]	#for resolutionIndex
 	
-	resolutionFactor, resolutionFactorReverse, imageSize = ATORtf_operations.getImageDimensionsR(resolutionProperties)
-	resolutionFactor, imageSize, axesLengthMax, filterRadius, filterSize = ATORtf_RFfilter.getFilterDimensions(resolutionProperties)
+	axesLengthMax, filterRadius, filterSize = ATORtf_RFfilter.getFilterDimensions(resolutionProperties)
 
-	#print("imageSize = ", imageSize)
+	#print("imageSize = ", resolutionProperties.imageSize)
 	#print("inputImageGrayTF.shape = ", inputImageGrayTF.shape)
 	#print("inputImageRGBTF.shape = ", inputImageRGBTF.shape)
-	#inputImageRGBTF = tf.image.resize(inputImageRGBTF, imageSize)
-	#inputImageGrayTF = tf.image.resize(inputImageGrayTF, imageSize)
+	#inputImageRGBTF = tf.image.resize(inputImageRGBTF, resolutionProperties.imageSize)
+	#inputImageGrayTF = tf.image.resize(inputImageGrayTF, resolutionProperties.imageSize)
 	#print("inputImageGrayTF.shape = ", inputImageGrayTF.shape)
 	#print("inputImageRGBTF.shape = ", inputImageRGBTF.shape)
 				
@@ -245,41 +253,78 @@ def applyRFfiltersList(resolutionProperties, inputImageRGBSegments, inputImageGr
 				RFImage = inputImageSegments[RFproperties.imageSegmentIndex]
 
 			centerCoordinates = RFproperties.centerCoordinates
-			allFilterCoordinatesWithinImageResult, imageSegmentStart, imageSegmentEnd = ATORtf_RFfilter.allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, imageSize)
+			allFilterCoordinatesWithinImageResult, imageSegmentStart, imageSegmentEnd = ATORtf_RFfilter.allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, resolutionProperties.imageSize)
 			if(allFilterCoordinatesWithinImageResult):
 			
 				#create child neuron:
-				neuron = ATORneuronClass(resolutionProperties.resolutionIndex, resolutionFactor, RFproperties, RFfilter, RFImage)
+				neuron = ATORneuronClass(resolutionProperties, RFproperties, RFfilter, RFImage)
+				
+				ATORneuronList = ATORneuronListArray[centerCoordinates[0]][centerCoordinates[1]]
+				if(ATORneuronList is None):	#ATORneuronList has not been initialised (filled with any items)
+					#initialise ATORneuronList
+					ATORneuronList = []
+					ATORneuronListArray[centerCoordinates[0]][centerCoordinates[1]] = ATORneuronList	
 				ATORneuronList.append(neuron)
 
 				#add to parent neuron:
-				foundParentNeuron, parentNeuron = findParentNeuron(ATORneuronListAllLayers, resolutionProperties.resolutionIndex, neuron)
+				foundParentNeuron, parentNeuron = findParentNeuron(ATORneuronListAllLayers, resolutionProperties.resolutionIndex, resolutionProperties, neuron)
 				if(foundParentNeuron):	
 					#print("foundParentNeuron")
 					parentNeuron.neuronComponents.append(neuron)
 					ATORtf_RF.normaliseRFComponentWRTparent(resolutionProperties, neuron, parentNeuron.RFproperties)
 					parentNeuron.neuronComponentsWeightsList.append(filterApplicationResult)
-					
-	ATORneuronListAllLayers.append(ATORneuronList)
 
-def findParentNeuron(ATORneuronListAllLayers, resolutionIndex, neuron):
+def findParentNeuron(ATORneuronListAllLayers, resolutionIndexLast, resolutionPropertiesChild, neuronChild):
 	foundParentNeuron = False
 	parentNeuron = None
-	if(resolutionIndex > resolutionIndexFirst):
-		resolutionIndexLower = resolutionIndex-1
-		ATORneuronList = ATORneuronListAllLayers[resolutionIndexLower]
-		for lowerNeuron in ATORneuronList:
-			#detect if RFproperties lies within RFpropertiesParent
-			#CHECKTHIS: for now just use simple centroid detection algorithm
-			if(ATORtf_RF.childRFoverlapsParentRF(neuron.RFpropertiesNormalisedGlobal, lowerNeuron.RFpropertiesNormalisedGlobal)):
-				foundParentNeuron = True
-				parentNeuron = lowerNeuron
+	if(resolutionIndexLast > resolutionPropertiesChild.resolutionIndexFirst):
+		resolutionIndex = resolutionIndexLast-1
+		ATORneuronListArray = ATORneuronListAllLayers[resolutionIndex]
+		
+		resolutionProperties = copy.deepcopy(resolutionPropertiesChild)
+		resolutionProperties.resolutionIndex = resolutionIndex
+		resolutionProperties.resolutionFactor, resolutionProperties.resolutionFactorReverse, resolutionProperties.imageSize = ATORtf_operations.getImageDimensionsR(resolutionProperties)	#reinitialiseRFProperties based on resolutionIndexLower
+		axesLengthMax, filterRadius, filterSize = ATORtf_RFfilter.getFilterDimensions(resolutionProperties)	#all for lower
+
+		#for all candidate parent RFs within rough receptive range as derived by resolution and centerCoordinates:
+		RFrangeGlobalMin, RFrangeGlobalMax = getRFrangeAtResolutionGlobal(resolutionPropertiesChild, neuronChild.RFproperties.centerCoordinates)
+		RFrangeLocalMin, RFrangeLocalMax = getRFrangeAtResolutionLocal(resolutionProperties, RFrangeGlobalMin, RFrangeGlobalMax)
+		for centerCoordinates1 in range(RFrangeLocalMin[0], RFrangeLocalMax[0]+1, ellipseCenterCoordinatesResolution):
+			for centerCoordinates2 in range(RFrangeLocalMin[1], RFrangeLocalMax[1]+1, ellipseCenterCoordinatesResolution):
+				centerCoordinates = [centerCoordinates1, centerCoordinates2]
+				
+				allFilterCoordinatesWithinImageResult, imageSegmentStart, imageSegmentEnd = ATORtf_RFfilter.allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, resolutionProperties.imageSize)
+				if(allFilterCoordinatesWithinImageResult):
+			
+					ATORneuronList = ATORneuronListArray[centerCoordinates[0]][centerCoordinates[1]]
+					if(ATORneuronList is not None):	#verify ATORneuronList has already been filled with some items 
+						for neuron in ATORneuronList:
+							#detect if RFproperties lies within RFpropertiesParent
+							#CHECKTHIS: for now just use simple centroid detection algorithm - this needs to be upgraded with a robust method
+							if(ATORtf_RF.childRFoverlapsParentRF(neuronChild.RFpropertiesNormalisedGlobal, neuron.RFpropertiesNormalisedGlobal)):
+								foundParentNeuron = True
+								parentNeuron = neuron
+								
 		if(not foundParentNeuron):	
 			#search for non-immediate (indirect) parent neuron:
-			foundParentNeuron, neuronFound = findParentNeuron(ATORneuronListAllLayers, resolutionIndexLower, neuron)
+			foundParentNeuron, neuronFound = findParentNeuron(ATORneuronListAllLayers, resolutionIndex, resolutionPropertiesChild, neuronChild)
+			
 	return foundParentNeuron, parentNeuron 
 
-
+	
+def getRFrangeAtResolutionGlobal(resolutionProperties, centerCoordinates):
+	axesLengthMax, filterRadius, filterSize = ATORtf_RFfilter.getFilterDimensions(resolutionProperties)
+	
+	RFrangeGlobalCentre = [int(centerCoordinates[0]*resolutionProperties.resolutionFactor), int(centerCoordinates[1]*resolutionProperties.resolutionFactor)]	#or RFrangeGlobalCentre = list(RFpropertiesNormalisedGlobal.centerCoordinates)
+	RFrangeGlobalSize = [int(filterSize[0]*resolutionProperties.resolutionFactor), int(filterSize[1]*resolutionProperties.resolutionFactor)]
+	RFrangeGlobalMin = [RFrangeGlobalCentre[0]-RFrangeGlobalSize[0], RFrangeGlobalCentre[1]-RFrangeGlobalSize[1]]
+	RFrangeGlobalMax = [RFrangeGlobalCentre[0]+RFrangeGlobalSize[0], RFrangeGlobalCentre[1]+RFrangeGlobalSize[1]]
+	return RFrangeGlobalMin, RFrangeGlobalMax
+	
+def getRFrangeAtResolutionLocal(resolutionProperties, RFrangeGlobalMin, RFrangeGlobalMax):
+	RFrangeLocalMin = [int(RFrangeGlobalMin[0]/resolutionProperties.resolutionFactor), int(RFrangeGlobalMin[1]/resolutionProperties.resolutionFactor)]
+	RFrangeLocalMax = [int(RFrangeGlobalMax[0]/resolutionProperties.resolutionFactor), int(RFrangeGlobalMax[1]/resolutionProperties.resolutionFactor)]
+	return RFrangeLocalMin, RFrangeLocalMax
 
 
 @click.command()
