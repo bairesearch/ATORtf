@@ -101,9 +101,9 @@ def rotateRFfilterTF(RFfilter, angle):
 	return RFfilterNormalised
 		
 
-#CHECKTHIS: upgrade code to support ATORtf_RFtri
 def getFilterDimensions(resolutionProperties):
-	return ATORtf_RFellipse.getFilterDimensions(resolutionProperties)
+	return ATORtf_RFproperties.getFilterDimensions(resolutionProperties)
+		
 
 #CHECKTHIS: upgrade code to support ATORtf_RFtri
 def allFilterCoordinatesWithinImage(centerCoordinates, filterRadius, imageSize):

@@ -150,7 +150,9 @@ def getImageDimensionsR(resolutionProperties):
 	resolutionFactorInverse = 1.0/(resolutionFactor)
 	#print("resolutionIndex = ", resolutionIndex, ", resolutionFactor = ", resolutionFactor)
 
-	imageSize = (int(resolutionProperties.imageSizeBase[0]*resolutionFactorInverse), int(resolutionProperties.imageSizeBase[1]*resolutionFactorInverse))
+	imageSize = (int(resolutionProperties.imageSizeBase[0]/resolutionFactor), int(resolutionProperties.imageSizeBase[1]/resolutionFactor))
+	
+	print("imageSize = ", imageSize)
 	
 	return resolutionFactor, resolutionFactorReverse, imageSize
 

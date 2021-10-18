@@ -66,7 +66,7 @@ debugVerbose = True
 debugSaveRFfiltersAndImageSegments = True	#only RF properties are required to be saved by ATOR algorithm (not image RF pixel data)
 
 resolutionIndexFirst = 0	#mandatory
-numberOfResolutions = 5	#x; lowest res sample: 1/(2^x)
+numberOfResolutions = 4	#x; lowest res sample: 1/(2^x)
 
 
 ellipseCenterCoordinatesResolution = 1	#pixels (at resolution r)
@@ -91,8 +91,35 @@ class ATORneuronClass():
 			self.RFImageNormalisedWRTparent = None
 		self.neuronComponents = []
 		self.neuronComponentsWeightsList = []
+
+def prepareRFhierarchyAccelerated():
+
+	RFfiltersListAllRes = []	#stores receptive field tensorflow objects (used for hardware accelerated filter detection)
+	RFfiltersPropertiesListAllRes = []	#stores receptive field ellipse properties (position, size, rotation, colour etc)
+
+	#RFneuralNetworkListAllRes = []	#store mapping between receptive fields at different resolutions (for fast lookup)	
+	ATORneuronListAllLayers = []
+
+	#generateRFfilters:
+	if(debugLowIterations):
+		resolutionIndexMax = 1
+	else:
+		resolutionIndexMax = numberOfResolutions
+			
+	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
+		resolutionProperties = ATORtf_operations.RFresolutionProperties(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFfiltersAndImageSegments)
+		RFfiltersList, RFfiltersPropertiesList = ATORtf_RF.generateRFfilters(resolutionProperties, generateRFfiltersEllipse, generateRFfiltersTri)
+		RFfiltersListAllRes.append(RFfiltersList)
+		RFfiltersPropertiesListAllRes.append(RFfiltersPropertiesList)
 		
-def createRFhierarchyAccelerated(inputimagefilename):
+	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
+		resolutionProperties = ATORtf_operations.RFresolutionProperties(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFfiltersAndImageSegments)
+		ATORneuronListArray = initialiseATORneuronListArray(resolutionProperties)
+		ATORneuronListAllLayers.append(ATORneuronListArray)
+		
+	return RFfiltersListAllRes, RFfiltersPropertiesListAllRes, ATORneuronListAllLayers
+				
+def updateRFhierarchyAccelerated(RFfiltersListAllRes, RFfiltersPropertiesListAllRes, ATORneuronListAllLayers, inputimagefilename):
 	
 	inputImage = cv2.imread(inputimagefilename)	#FUTURE: support 3D datasets
 	
@@ -114,15 +141,10 @@ def createRFhierarchyAccelerated(inputimagefilename):
 	print("inputImageHeight = ", inputImageHeight, "inputImageWidth = ", inputImageWidth, ", inputImageChannels = ", inputImageChannels)
 	blankArray = np.full((inputImageHeight, inputImageWidth, 3), 255, np.uint8)
 	outputImage = blankArray
-
-	#RFneuralNetworkListAllRes = []	#store mapping between receptive fields at different resolutions (for fast lookup)	
-	ATORneuronListAllLayers = []
 			
 	inputImageRGBSegmentsAllRes = []	#stores subsets of input image at different resolutions, centreCoordinates, and size
 	inputImageGraySegmentsAllRes = []
-	RFfiltersListAllRes = []	#stores receptive field tensorflow objects (used for hardware accelerated filter detection)
-	RFfiltersPropertiesListAllRes = []	#stores receptive field ellipse properties (position, size, rotation, colour etc)
-	
+
 	#generateRFfilters:
 	if(debugLowIterations):
 		resolutionIndexMax = 1
@@ -136,17 +158,6 @@ def createRFhierarchyAccelerated(inputimagefilename):
 		inputImageRGBSegments, inputImageGraySegments = generateImageSegments(resolutionProperties, inputImageRGBTF, inputImageGrayTF)
 		inputImageRGBSegmentsAllRes.append(inputImageRGBSegments)
 		inputImageGraySegmentsAllRes.append(inputImageGraySegments)
-		
-	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
-		resolutionProperties = ATORtf_operations.RFresolutionProperties(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFfiltersAndImageSegments)
-		RFfiltersList, RFfiltersPropertiesList = ATORtf_RF.generateRFfilters(resolutionProperties, generateRFfiltersEllipse, generateRFfiltersTri)
-		RFfiltersListAllRes.append(RFfiltersList)
-		RFfiltersPropertiesListAllRes.append(RFfiltersPropertiesList)
-		
-	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
-		resolutionProperties = ATORtf_operations.RFresolutionProperties(resolutionIndex, resolutionIndexFirst, numberOfResolutions, imageSizeBase, debugVerbose, debugSaveRFfiltersAndImageSegments)
-		ATORneuronListArray = initialiseATORneuronListArray(resolutionProperties)
-		ATORneuronListAllLayers.append(ATORneuronListArray)
 		
 	#applyRFfilters:
 	for resolutionIndex in range(resolutionIndexFirst, resolutionIndexMax):
@@ -269,7 +280,7 @@ def applyRFfiltersList(resolutionProperties, inputImageRGBSegments, inputImageGr
 				#add to parent neuron:
 				foundParentNeuron, parentNeuron = findParentNeuron(ATORneuronListAllLayers, resolutionProperties.resolutionIndex, resolutionProperties, neuron)
 				if(foundParentNeuron):	
-					#print("foundParentNeuron")
+					print("foundParentNeuron")
 					parentNeuron.neuronComponents.append(neuron)
 					ATORtf_RF.normaliseRFComponentWRTparent(resolutionProperties, neuron, parentNeuron.RFproperties)
 					parentNeuron.neuronComponentsWeightsList.append(filterApplicationResult)
@@ -331,8 +342,13 @@ def getRFrangeAtResolutionLocal(resolutionProperties, RFrangeGlobalMin, RFrangeG
 @click.argument('inputimagefilename')
 
 def main(inputimagefilename):
-	createRFhierarchyAccelerated(inputimagefilename)
+
 	#ATORtf_detectEllipses.main(inputimagefilename)
+
+	RFfiltersListAllRes, RFfiltersPropertiesListAllRes, ATORneuronListAllLayers = prepareRFhierarchyAccelerated()
+	
+	updateRFhierarchyAccelerated(RFfiltersListAllRes, RFfiltersPropertiesListAllRes, ATORneuronListAllLayers, inputimagefilename)	#trial image
+	
 
 if __name__ == "__main__":
 	main()

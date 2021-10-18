@@ -32,7 +32,7 @@ import ATORtf_ellipseProperties
 resolutionIndexFirst = 1
 
 numberOfResolutions = 6	#x; lowest res sample: 1/(2^x)
-minimumEllipseLength = 2
+minimumEllipseAxisLength = 2
 ellipseCenterCoordinatesResolution = 1	#pixels (at resolution r)
 ellipseAxesLengthResolution = 1	#pixels (at resolution r)
 ellipseAngleResolution = 10	#degrees
@@ -131,8 +131,8 @@ def detectEllipsesTrialResize(inputimagefilename):
 		
 		for centerCoordinates1 in range(0, imageWidth, ellipseCenterCoordinatesResolution):
 			for centerCoordinates2 in range(0, imageHeight, ellipseCenterCoordinatesResolution):
-				for axesLength1 in range(minimumEllipseLength, axesLengthMax1, ellipseAxesLengthResolution):
-					for axesLength2 in range(minimumEllipseLength, axesLengthMax2, ellipseAxesLengthResolution):
+				for axesLength1 in range(minimumEllipseAxisLength, axesLengthMax1, ellipseAxesLengthResolution):
+					for axesLength2 in range(minimumEllipseAxisLength, axesLengthMax2, ellipseAxesLengthResolution):
 						for angle in range(0, 360, ellipseAngleResolution):	#degrees
 							for colour1 in range(0, 256, ellipseColourResolution):
 								for colour2 in range(0, 256, ellipseColourResolution):
@@ -167,7 +167,7 @@ def detectEllipsesTrialResize(inputimagefilename):
 				ellipsePropertiesOptimumNormalisedAllRes.append(ellipsePropertiesNormalisedOptimumLast)
 				ellipsePropertiesOptimumNormalisedR.append(ellipsePropertiesNormalisedOptimumLast)
 				#inputImageRmod, ellipseFitError = ATORtf_ellipseProperties.testEllipseApproximation(inputImageR, ellipseProperties)
-				outputImage = ATORtf_ellipseProperties.drawEllipse(outputImage, ellipsePropertiesNormalisedOptimumLast)
+				outputImage = ATORtf_ellipseProperties.drawEllipse(outputImage, ellipsePropertiesNormalisedOptimumLast, False)
 				ATORtf_operations.displayImage(outputImage)
 				ATORtf_operations.saveImage(inputimagefilename, outputImage)
 

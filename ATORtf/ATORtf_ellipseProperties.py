@@ -36,26 +36,41 @@ class EllipsePropertiesClass():	#or EllipsoidProperties
 		self.angle = angle
 		self.colour = colour	#only used by ATORtf_detectEllipses
 	
-def drawEllipse(outputImage, ellipseProperties):
+def drawEllipse(outputImage, ellipseProperties, relativeCoordiantes):
 	#https://docs.opencv.org/4.5.3/d6/d6e/group__imgproc__draw.html#ga28b2267d35786f5f890ca167236cbc69
 	#print("ellipseProperties.centerCoordinates = ", ellipseProperties.centerCoordinates)
 	#print("ellipseProperties.axesLength = ", ellipseProperties.axesLength)
 	#print("ellipseProperties.angle = ", ellipseProperties.angle)
 	#print("ellipseProperties.colour = ", ellipseProperties.colour)
 	
-	outputImageMod = cv2.ellipse(outputImage, ellipseProperties.centerCoordinates, ellipseProperties.axesLength, ellipseProperties.angle, 0, 360, ellipseProperties.colour, -1)
+	centerCoordinates = getAbsoluteImageCenterCoordinates(outputImage, ellipseProperties, relativeCoordiantes)	
+	#print("centerCoordinates = ", centerCoordinates)
+	
+	outputImageMod = cv2.ellipse(outputImage, centerCoordinates, ellipseProperties.axesLength, ellipseProperties.angle, 0, 360, ellipseProperties.colour, -1)
 	
 	#print("outputImageMod = ", outputImageMod)
 	
 	return outputImageMod
 	
-def drawCircle(outputImage, ellipseProperties):	
-	outputImageMod = cv2.circle(outputImage, ellipseProperties.centerCoordinates, ellipseProperties.axesLength[0], ellipseProperties.colour, -1)
+def drawCircle(outputImage, ellipseProperties, relativeCoordiantes):	
+	#https://docs.opencv.org/4.5.3/d6/d6e/group__imgproc__draw.html#gaf10604b069374903dbd0f0488cb43670
+	
+	centerCoordinates = getAbsoluteImageCenterCoordinates(outputImage, ellipseProperties, relativeCoordiantes)
+	
+	outputImageMod = cv2.circle(outputImage, centerCoordinates, ellipseProperties.axesLength[0], ellipseProperties.colour, -1)
 	
 	#print("outputImageMod = ", outputImageMod)
 	
 	return outputImageMod
 
+def getAbsoluteImageCenterCoordinates(outputImage, ellipseProperties, relativeCoordiantes):
+	if(relativeCoordiantes):
+		imageSize = outputImage.shape
+		centerCoordinates = (ellipseProperties.centerCoordinates[0]+int(imageSize[0]/2), ellipseProperties.centerCoordinates[1]+int(imageSize[1]/2))
+	else:
+		centerCoordinates = ellipseProperties.centerCoordinates
+	return centerCoordinates
+		
 def normaliseGlobalEllipseProperties(ellipseProperties, resolutionFactor):
 	resolutionFactor = ellipseProperties.resolutionFactor
 	ellipsePropertiesNormalised = copy.deepcopy(ellipseProperties) 

@@ -29,6 +29,10 @@ import ATORtf_operations
 RFtypeEllipse = 1
 RFtypeTri = 2
 
+minimumEllipseAxisLength = 1
+receptiveFieldOpponencyArea = 2.0	#the radius of the opponency/negative (-1) receptive field compared to the additive (+) receptive field
+
+lowResultFilterPosition = True
 
 #supportFractionalRFdrawSize = False	#floats unsupported by opencv ellipse draw - requires large draw, then resize down (interpolation)
 
@@ -100,15 +104,19 @@ def drawRF(blankArray, RFfilterTF, RFpropertiesInside, RFpropertiesOutside, draw
 	RFpropertiesInsideBlack.colour = (000, 000, 000)
 	
 	if(drawEllipse):
-		ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageInside, RFpropertiesInsideWhite)
+		print("drawEllipse")
+		ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageInside, RFpropertiesInsideWhite, True)
 
-		ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageOutside, RFpropertiesOutsideWhite)
-		ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageOutside, RFpropertiesInsideBlack)	
+		ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageOutside, RFpropertiesOutsideWhite, True)
+		ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageOutside, RFpropertiesInsideBlack, True)	
 	else:	
-		ATORtf_ellipseProperties.drawCircle(ellipseFilterImageInside, RFpropertiesInsideWhite)
+		ATORtf_ellipseProperties.drawCircle(ellipseFilterImageInside, RFpropertiesInsideWhite, True)
 
-		ATORtf_ellipseProperties.drawCircle(ellipseFilterImageOutside, RFpropertiesOutsideWhite)
-		ATORtf_ellipseProperties.drawCircle(ellipseFilterImageOutside, RFpropertiesInsideBlack)
+		ATORtf_ellipseProperties.drawCircle(ellipseFilterImageOutside, RFpropertiesOutsideWhite, True)
+		ATORtf_ellipseProperties.drawCircle(ellipseFilterImageOutside, RFpropertiesInsideBlack, True)
+	
+	#ATORtf_operations.displayImage(ellipseFilterImageInside)
+	#ATORtf_operations.displayImage(ellipseFilterImageOutside)
 	
 	insideImageTF = tf.convert_to_tensor(ellipseFilterImageInside, dtype=tf.float32)	#bool
 	insideImageTF = tf.greater(insideImageTF, 0.0)
@@ -201,4 +209,33 @@ def calculateEndCoordinatesPosition3D(neuronComponent):
 	endCoordinates = (neuronComponent.RFproperties.centerCoordinates[0]+endCoordinatesRelativeToCentreCoordinates[0], neuronComponent.RFproperties.centerCoordinates[1]+endCoordinatesRelativeToCentreCoordinates[1], neuronComponent.RFproperties.centerCoordinates[2]+endCoordinatesRelativeToCentreCoordinates[2])	#CHECKTHIS: + or -
 	return endCoordinates
 
+def saveRFFilterImage(RFfilter, RFfilterImageFilename):
+	#print(RFfilter)
+	RFfilterMask =  tf.cast(tf.not_equal(RFfilter, 0.0), tf.float32)
+	RFfilterImage = tf.add(RFfilter, 3.0)
+	RFfilterImage = tf.divide(RFfilterImage, 4.0)
+	RFfilterImage = tf.multiply(RFfilterImage, RFfilterMask)
+	RFfilterImage = tf.multiply(RFfilterImage, ATORtf_operations.rgbMaxValue)
+	RFfilterUint8 = tf.cast(RFfilterImage, tf.uint8)
+	RFfilterNP = RFfilterUint8.numpy()	#FORMAT: np.full((inputImageHeight, inputImageWidth, 3), 255, np.uint8)
+	ATORtf_operations.saveImage(RFfilterImageFilename, RFfilterNP)
 
+#use common filter dimensions across all filter types (for ellipse/tri)
+def getFilterDimensions(resolutionProperties):
+	#reduce max size of ellipse at each res
+	axesLengthMax1 = minimumEllipseAxisLength*4
+	axesLengthMax2 = minimumEllipseAxisLength*4
+	filterRadius = int(max(axesLengthMax1*receptiveFieldOpponencyArea, axesLengthMax2*receptiveFieldOpponencyArea))
+	#axesLengthMax1 = int(resolutionProperties.imageSize[0]//resolutionProperties.resolutionFactorReverse * 1 / 2)	#CHECKTHIS
+	#axesLengthMax2 = int(resolutionProperties.imageSize[1]//resolutionProperties.resolutionFactorReverse * 1 / 2)	#CHECKTHIS
+	#filterRadius = int(max(axesLengthMax1*receptiveFieldOpponencyArea, axesLengthMax2*receptiveFieldOpponencyArea)/2)
+	filterSize = (int(filterRadius*2), int(filterRadius*2))	#x/y dimensions are identical
+	axesLengthMax = (axesLengthMax1, axesLengthMax2)
+	
+	#print("resolutionFactorReverse = ", resolutionProperties.resolutionFactorReverse)
+	#print("resolutionFactor = ", resolutionProperties.imageSize)
+	#print("axesLengthMax = ", axesLengthMax)
+	
+	return axesLengthMax, filterRadius, filterSize	
+	
+	
