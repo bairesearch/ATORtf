@@ -79,9 +79,9 @@ def calculateFilterPixels(filterSize, numberOfDimensions):
 
 def getInternalFilterSize(filterSize, numberOfDimensions):
 	if(numberOfDimensions == 2):
-		internalFilterSize = ((filterSize[0]/ATORtf_RFproperties.receptiveFieldOpponencyArea), (filterSize[1]/ATORtf_RFproperties.receptiveFieldOpponencyArea))
+		internalFilterSize = ((filterSize[0]/ATORtf_RFproperties.receptiveFieldOpponencyAreaFactorEllipse), (filterSize[1]/ATORtf_RFproperties.receptiveFieldOpponencyAreaFactorEllipse))
 	elif(numberOfDimensions == 3):
-		internalFilterSize = ((filterSize[0]/ATORtf_RFproperties.receptiveFieldOpponencyArea), (filterSize[1]/ATORtf_RFproperties.receptiveFieldOpponencyArea))	#CHECKTHIS
+		internalFilterSize = ((filterSize[0]/ATORtf_RFproperties.receptiveFieldOpponencyAreaFactorEllipse), (filterSize[1]/ATORtf_RFproperties.receptiveFieldOpponencyAreaFactorEllipse))	#CHECKTHIS
 	return internalFilterSize
 	
 
@@ -147,7 +147,7 @@ def generateRotationalInvariantRFfilters(resolutionProperties, isColourFilter, f
 				for angle in range(0, 360, ellipseAngleResolution):	#degrees
 
 					axesLengthInside = (axesLength1, axesLength2)
-					axesLengthOutside = (int(axesLength1*ATORtf_RFproperties.receptiveFieldOpponencyArea), int(axesLength2*ATORtf_RFproperties.receptiveFieldOpponencyArea))
+					axesLengthOutside = (int(axesLength1*ATORtf_RFproperties.receptiveFieldOpponencyAreaFactorEllipse), int(axesLength2*ATORtf_RFproperties.receptiveFieldOpponencyAreaFactorEllipse))
 					filterCenterCoordinates = (0, 0)
 
 					RFpropertiesInside = ATORtf_RFproperties.RFpropertiesClass(resolutionProperties.resolutionIndex, resolutionProperties.resolutionFactor, filterSize, ATORtf_RFproperties.RFtypeEllipse, filterCenterCoordinates, axesLengthInside, angle, filterInsideColour)
@@ -195,7 +195,7 @@ def generateRFfilter(resolutionProperties, isColourFilter, RFpropertiesInside, R
 	RFfilterTF = tf.convert_to_tensor(blankArray, dtype=tf.float32)
 
 	
-	RFfilterTF = ATORtf_RFproperties.drawRF(blankArray, RFfilterTF, RFpropertiesInside, RFpropertiesOutside, True)
+	RFfilterTF = ATORtf_RFproperties.drawRF(RFfilterTF, RFpropertiesInside, RFpropertiesOutside, ATORtf_RFproperties.RFfeatureTypeEllipse, False)
 	
 	#print("RFfilterTF = ", RFfilterTF)
 

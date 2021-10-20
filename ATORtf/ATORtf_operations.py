@@ -152,7 +152,7 @@ def getImageDimensionsR(resolutionProperties):
 
 	imageSize = (int(resolutionProperties.imageSizeBase[0]/resolutionFactor), int(resolutionProperties.imageSizeBase[1]/resolutionFactor))
 	
-	print("imageSize = ", imageSize)
+	#print("imageSize = ", imageSize)
 	
 	return resolutionFactor, resolutionFactorReverse, imageSize
 
@@ -163,8 +163,8 @@ def isTensorEmpty(tensor):
 			
 def calculateRelativePositionGivenAngleAndLength(angle, length):
 	theta = convertDegreesToRadians(angle)
-	x = math.cos(theta)
-	y = math.sin(theta)
+	x = math.cos(theta)*length
+	y = math.sin(theta)*length
 	#point = [x, y]	#floats unsupported by opencv ellipse draw
 	point = [int(x), int(y)]
 	return point

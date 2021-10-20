@@ -29,8 +29,15 @@ import ATORtf_operations
 RFtypeEllipse = 1
 RFtypeTri = 2
 
-minimumEllipseAxisLength = 1
-receptiveFieldOpponencyArea = 2.0	#the radius of the opponency/negative (-1) receptive field compared to the additive (+) receptive field
+RFfeatureTypeEllipse = 1
+RFfeatureTypeCircle = 2
+RFfeatureTypePoint = 3
+RFfeatureTypeCorner = 4
+
+maximumAxisLengthMultiplierDefault = 4
+
+minimumEllipseAxisLength = 1	#1
+receptiveFieldOpponencyAreaFactorEllipse = 2.0	#the radius of the opponency/negative (-1) receptive field compared to the additive (+) receptive field
 
 lowResultFilterPosition = True
 
@@ -88,7 +95,7 @@ def printRFproperties(RFproperties):
 		print("vertexCoordinatesRelative = ", RFproperties.vertexCoordinatesRelative)
 	
 #this function is used by both ATORtf_RFellipse/ATORtf_RFtri
-def drawRF(blankArray, RFfilterTF, RFpropertiesInside, RFpropertiesOutside, drawEllipse):
+def drawRF(RFfilterTF, RFpropertiesInside, RFpropertiesOutside, drawFeatureType, drawFeatureOverlay):
 
 	blankArray = np.full((RFpropertiesInside.imageSize[1], RFpropertiesInside.imageSize[0], 1), 0, np.uint8)	#grayscale (or black/white)	#0: black	#or filterSize
 
@@ -103,17 +110,27 @@ def drawRF(blankArray, RFfilterTF, RFpropertiesInside, RFpropertiesOutside, draw
 	RFpropertiesInsideBlack = copy.deepcopy(RFpropertiesInside)
 	RFpropertiesInsideBlack.colour = (000, 000, 000)
 	
-	if(drawEllipse):
+	if(drawFeatureType == RFfeatureTypeEllipse):
 		print("drawEllipse")
 		ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageInside, RFpropertiesInsideWhite, True)
 
 		ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageOutside, RFpropertiesOutsideWhite, True)
 		ATORtf_ellipseProperties.drawEllipse(ellipseFilterImageOutside, RFpropertiesInsideBlack, True)	
-	else:	
+	elif(drawFeatureType == RFfeatureTypeCircle):	#NOTUSED
 		ATORtf_ellipseProperties.drawCircle(ellipseFilterImageInside, RFpropertiesInsideWhite, True)
 
 		ATORtf_ellipseProperties.drawCircle(ellipseFilterImageOutside, RFpropertiesOutsideWhite, True)
 		ATORtf_ellipseProperties.drawCircle(ellipseFilterImageOutside, RFpropertiesInsideBlack, True)
+	elif(drawFeatureType == RFfeatureTypePoint):
+		ATORtf_ellipseProperties.drawPoint(ellipseFilterImageInside, RFpropertiesInsideWhite, True)
+
+		ATORtf_ellipseProperties.drawCircle(ellipseFilterImageOutside, RFpropertiesOutsideWhite, True)
+		ATORtf_ellipseProperties.drawPoint(ellipseFilterImageOutside, RFpropertiesInsideBlack, True)	
+	elif(drawFeatureType == RFfeatureTypeCorner):	#INCOMPLETE
+		ATORtf_ellipseProperties.drawPoint(ellipseFilterImageInside, RFpropertiesInsideWhite, True)
+
+		ATORtf_ellipseProperties.drawRectangle(ellipseFilterImageOutside, RFpropertiesOutsideWhite, True)
+		ATORtf_ellipseProperties.drawPoint(ellipseFilterImageOutside, RFpropertiesInsideBlack, True)
 	
 	#ATORtf_operations.displayImage(ellipseFilterImageInside)
 	#ATORtf_operations.displayImage(ellipseFilterImageOutside)
@@ -156,8 +173,24 @@ def drawRF(blankArray, RFfilterTF, RFpropertiesInside, RFpropertiesOutside, draw
 	#print(insideImageTF.shape)
 	#print(outsideImageTF.shape)
 		
-	RFfilterTF = tf.add(RFfilterTF, insideImageTF)
-	RFfilterTF = tf.add(RFfilterTF, outsideImageTF)
+	if(drawFeatureOverlay):
+		#TODO: require a more efficient mask function
+		RFfilterTFon = tf.not_equal(RFfilterTF, 0.0)
+		insideImageTFon = tf.not_equal(insideImageTF, 0.0)
+		outsideImageTFon = tf.not_equal(outsideImageTF, 0.0)
+		insideImageTFonOverlap = tf.logical_and(RFfilterTFon, insideImageTFon)
+		outsideImageTFonOverlap = tf.logical_and(RFfilterTFon, outsideImageTFon)
+		insideImageTFonMask = tf.cast(tf.logical_not(insideImageTFonOverlap), tf.float32)
+		outsideImageTFonMask = tf.cast(tf.logical_not(outsideImageTFonOverlap), tf.float32)
+		insideImageTF = tf.multiply(insideImageTF, insideImageTFonMask)
+		outsideImageTF = tf.multiply(outsideImageTF, outsideImageTFonMask)
+		RFfilterTF = tf.add(RFfilterTF, insideImageTF)
+		RFfilterTF = tf.add(RFfilterTF, outsideImageTF)
+		#RFfilterTF = tf.maximum(RFfilterTF, insideImageTF)
+		#RFfilterTF = tf.minimum(RFfilterTF, outsideImageTF)	
+	else:
+		RFfilterTF = tf.add(RFfilterTF, insideImageTF)
+		RFfilterTF = tf.add(RFfilterTF, outsideImageTF)
 	
 	return RFfilterTF
 
@@ -221,14 +254,14 @@ def saveRFFilterImage(RFfilter, RFfilterImageFilename):
 	ATORtf_operations.saveImage(RFfilterImageFilename, RFfilterNP)
 
 #use common filter dimensions across all filter types (for ellipse/tri)
-def getFilterDimensions(resolutionProperties):
+def getFilterDimensions(resolutionProperties, maximumAxisLengthMultiplier=maximumAxisLengthMultiplierDefault, receptiveFieldOpponencyAreaFactor=receptiveFieldOpponencyAreaFactorEllipse):
 	#reduce max size of ellipse at each res
-	axesLengthMax1 = minimumEllipseAxisLength*4
-	axesLengthMax2 = minimumEllipseAxisLength*4
-	filterRadius = int(max(axesLengthMax1*receptiveFieldOpponencyArea, axesLengthMax2*receptiveFieldOpponencyArea))
+	axesLengthMax1 = minimumEllipseAxisLength*maximumAxisLengthMultiplier
+	axesLengthMax2 = minimumEllipseAxisLength*maximumAxisLengthMultiplier
+	filterRadius = int(max(axesLengthMax1*receptiveFieldOpponencyAreaFactor, axesLengthMax2*receptiveFieldOpponencyAreaFactor))
 	#axesLengthMax1 = int(resolutionProperties.imageSize[0]//resolutionProperties.resolutionFactorReverse * 1 / 2)	#CHECKTHIS
 	#axesLengthMax2 = int(resolutionProperties.imageSize[1]//resolutionProperties.resolutionFactorReverse * 1 / 2)	#CHECKTHIS
-	#filterRadius = int(max(axesLengthMax1*receptiveFieldOpponencyArea, axesLengthMax2*receptiveFieldOpponencyArea)/2)
+	#filterRadius = int(max(axesLengthMax1*receptiveFieldOpponencyAreaFactor, axesLengthMax2*receptiveFieldOpponencyAreaFactor)/2)
 	filterSize = (int(filterRadius*2), int(filterRadius*2))	#x/y dimensions are identical
 	axesLengthMax = (axesLengthMax1, axesLengthMax2)
 	

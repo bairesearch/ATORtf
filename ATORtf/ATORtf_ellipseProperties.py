@@ -46,26 +46,50 @@ def drawEllipse(outputImage, ellipseProperties, relativeCoordiantes):
 	centerCoordinates = getAbsoluteImageCenterCoordinates(outputImage, ellipseProperties, relativeCoordiantes)	
 	#print("centerCoordinates = ", centerCoordinates)
 	
-	outputImageMod = cv2.ellipse(outputImage, centerCoordinates, ellipseProperties.axesLength, ellipseProperties.angle, 0, 360, ellipseProperties.colour, -1)
+	cv2.ellipse(outputImage, centerCoordinates, ellipseProperties.axesLength, ellipseProperties.angle, 0, 360, ellipseProperties.colour, -1)
 	
-	#print("outputImageMod = ", outputImageMod)
-	
-	return outputImageMod
-	
+	#print("outputImage = ", outputImage)
+		
 def drawCircle(outputImage, ellipseProperties, relativeCoordiantes):	
 	#https://docs.opencv.org/4.5.3/d6/d6e/group__imgproc__draw.html#gaf10604b069374903dbd0f0488cb43670
 	
 	centerCoordinates = getAbsoluteImageCenterCoordinates(outputImage, ellipseProperties, relativeCoordiantes)
 	
-	outputImageMod = cv2.circle(outputImage, centerCoordinates, ellipseProperties.axesLength[0], ellipseProperties.colour, -1)
+	cv2.circle(outputImage, centerCoordinates, ellipseProperties.axesLength[0], ellipseProperties.colour, -1)
 	
-	#print("outputImageMod = ", outputImageMod)
-	
-	return outputImageMod
+	#print("outputImage = ", outputImage)
 
+def drawRectangle(outputImage, ellipseProperties, relativeCoordiantes):	
+	#https://docs.opencv.org/4.5.3/d6/d6e/group__imgproc__draw.html#ga07d2f74cadcf8e305e810ce8eed13bc9
+	
+	centerCoordinates = getAbsoluteImageCenterCoordinates(outputImage, ellipseProperties, relativeCoordiantes)
+	
+	#print("ellipseProperties.axesLength[0] = ", ellipseProperties.axesLength[0])
+	
+	point1 = (centerCoordinates[0]-ellipseProperties.axesLength[0], centerCoordinates[1]-ellipseProperties.axesLength[1])
+	point2 = (centerCoordinates[0]+ellipseProperties.axesLength[0], centerCoordinates[1]+ellipseProperties.axesLength[1])
+	cv2.rectangle(outputImage, point1, point2, ellipseProperties.colour, -1)
+	
+	#print("outputImage = ", outputImage)
+	
+	
+def drawPoint(outputImage, ellipseProperties, relativeCoordiantes):		
+	centerCoordinates = getAbsoluteImageCenterCoordinates(outputImage, ellipseProperties, relativeCoordiantes)
+	
+	#print("ellipseProperties.centerCoordinates = ", ellipseProperties.centerCoordinates)
+	#print("centerCoordinates = ", centerCoordinates)
+	
+	x = centerCoordinates[0]
+	y = centerCoordinates[1]
+	outputImage[y, x, 0] = ellipseProperties.colour[0]
+	
+	#print("outputImage = ", outputImage)
+		
+	
 def getAbsoluteImageCenterCoordinates(outputImage, ellipseProperties, relativeCoordiantes):
 	if(relativeCoordiantes):
 		imageSize = outputImage.shape
+		#print("imageSize = ", imageSize)
 		centerCoordinates = (ellipseProperties.centerCoordinates[0]+int(imageSize[0]/2), ellipseProperties.centerCoordinates[1]+int(imageSize[1]/2))
 	else:
 		centerCoordinates = ellipseProperties.centerCoordinates
