@@ -6,6 +6,8 @@ Richard Bruce Baxter - Copyright (c) 2021 Baxter AI (baxterai.com)
 
 ### Description
 
+Axis Transformation Object Recognition (ATOR) for TensorFlow - experimental implementation based on elliptical receptive fields 
+
 ATORtf is a hardware accelerated version of BAI ATOR (Axis Transformation Object Recognition) for TensorFlow.
 
 ATORtf supports ellipsoid features, and normalises them with respect to their major/minor ellipticity axis orientation. 
@@ -35,7 +37,6 @@ conda install --file condaRequirements.txt
 		pillow
 pip install tensorflow-addons
 pip install opencv-python opencv-contrib-python
-
 ```
 
 ### Execution
